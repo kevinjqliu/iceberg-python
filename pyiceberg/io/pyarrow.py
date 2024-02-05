@@ -1071,7 +1071,7 @@ def project_table(
             if isinstance(table.io, FsspecFileIO):
                 from pyarrow.fs import PyFileSystem
 
-                fs = PyFileSystem(FSSpecHandler(table.io.get_fs(scheme)))
+                fs = PyFileSystem(FSSpecHandler(table.io.fs_by_scheme(scheme, "")))
             else:
                 raise ValueError(f"Expected PyArrowFileIO or FsspecFileIO, got: {table.io}")
         except ModuleNotFoundError as e:

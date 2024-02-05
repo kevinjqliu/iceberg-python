@@ -25,6 +25,8 @@ from typing import (
     Any,
     Callable,
     Dict,
+    Optional,
+    Tuple,
     Union,
 )
 from urllib.parse import urlparse
@@ -285,10 +287,31 @@ class FsspecFileIO(FileIO):
     """A FileIO implementation that uses fsspec."""
 
     def __init__(self, properties: Properties):
-        self._scheme_to_fs = {}
-        self._scheme_to_fs.update(SCHEME_TO_FS)
-        self.get_fs: Callable[[str], AbstractFileSystem] = lru_cache(self._get_fs)
+        self.fs_by_scheme: Callable[[str, Optional[str]], AbstractFileSystem] = lru_cache(self._initialize_fs)
         super().__init__(properties=properties)
+
+    @staticmethod
+    def parse_location(location: str) -> Tuple[str, str, str]:
+        """Return the path without the scheme."""
+        uri = urlparse(location)
+        if not uri.scheme:
+            return "file", uri.netloc, os.path.abspath(location)
+        elif uri.scheme == "hdfs":
+            return uri.scheme, uri.netloc, location
+        else:
+            return uri.scheme, uri.netloc, f"{uri.netloc}{uri.path}"
+
+    def _initialize_fs(self, scheme: str, netloc: Optional[str] = None) -> AbstractFileSystem:
+        if scheme in {"s3", "s3a", "s3n"}:
+            return _s3(self.properties)
+        # elif scheme == "hdfs":
+        #     return HadoopFileSystem(**hdfs_kwargs)
+        elif scheme in {"gs", "gcs"}:
+            return _gs(self.properties)
+        elif scheme == "file":
+            return _file(self.properties)
+        else:
+            raise ValueError(f"Unrecognized filesystem type in URI: {scheme}")
 
     def new_input(self, location: str) -> FsspecInputFile:
         """Get an FsspecInputFile instance to read bytes from the file at the given location.
@@ -299,8 +322,8 @@ class FsspecFileIO(FileIO):
         Returns:
             FsspecInputFile: An FsspecInputFile instance for the given location.
         """
-        uri = urlparse(location)
-        fs = self.get_fs(uri.scheme)
+        scheme, netloc, _ = self.parse_location(location)
+        fs = self.fs_by_scheme(scheme, netloc)
         return FsspecInputFile(location=location, fs=fs)
 
     def new_output(self, location: str) -> FsspecOutputFile:
@@ -312,8 +335,8 @@ class FsspecFileIO(FileIO):
         Returns:
             FsspecOutputFile: An FsspecOutputFile instance for the given location.
         """
-        uri = urlparse(location)
-        fs = self.get_fs(uri.scheme)
+        scheme, netloc, _ = self.parse_location(location)
+        fs = self.fs_by_scheme(scheme, netloc)
         return FsspecOutputFile(location=location, fs=fs)
 
     def delete(self, location: Union[str, InputFile, OutputFile]) -> None:
@@ -324,17 +347,7 @@ class FsspecFileIO(FileIO):
                 OutputFile instance is provided, the location attribute for that instance is used as the location
                 to delete.
         """
-        if isinstance(location, (InputFile, OutputFile)):
-            str_location = location.location  # Use InputFile or OutputFile location
-        else:
-            str_location = location
-
-        uri = urlparse(str_location)
-        fs = self.get_fs(uri.scheme)
-        fs.rm(str_location)
-
-    def _get_fs(self, scheme: str) -> AbstractFileSystem:
-        """Get a filesystem for a specific scheme."""
-        if scheme not in self._scheme_to_fs:
-            raise ValueError(f"No registered filesystem for scheme: {scheme}")
-        return self._scheme_to_fs[scheme](self.properties)
+        str_location = location.location if isinstance(location, (InputFile, OutputFile)) else location
+        scheme, netloc, path = self.parse_location(str_location)
+        fs = self.fs_by_scheme(scheme, netloc)
+        fs.rm(path)
