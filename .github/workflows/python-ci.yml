@@ -38,16 +38,20 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - name: Install poetry
-      run: make install-poetry
-    - uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python }}
-        cache: poetry
-        cache-dependency-path: ./poetry.lock
-    - name: Install
-      run: make install-dependencies
+    - uses: ./.github/actions/install-env
+    # - name: Install poetry
+    #   run: make install-poetry
+    # - uses: actions/setup-python@v5
+    #   with:
+    #     python-version: ${{ matrix.python }}
+    #     cache: poetry
+    #     cache-dependency-path: ./poetry.lock
+
+    # - name: Install
+    #   run: make install-dependencies
+
     - name: Linters
       run: make lint
+
     - name: Tests
       run: make test-coverage
