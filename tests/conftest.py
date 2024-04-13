@@ -2098,6 +2098,11 @@ TEST_DATA_WITH_NULL = {
 
 
 @pytest.fixture(scope="session")
+def test_data_with_null() -> dict[str, Any]:
+    return TEST_DATA_WITH_NULL
+
+
+@pytest.fixture(scope="session")
 def pa_schema() -> "pa.Schema":
     import pyarrow as pa
 
