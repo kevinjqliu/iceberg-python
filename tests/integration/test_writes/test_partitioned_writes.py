@@ -16,6 +16,8 @@
 # under the License.
 # pylint:disable=redefined-outer-name
 
+from typing import Any
+
 import pyarrow as pa
 import pytest
 from pyspark.sql import SparkSession
@@ -32,7 +34,6 @@ from pyiceberg.transforms import (
     TruncateTransform,
     YearTransform,
 )
-from tests.conftest import TEST_DATA_WITH_NULL
 from utils import TABLE_SCHEMA, _create_table
 
 
@@ -42,7 +43,12 @@ from utils import TABLE_SCHEMA, _create_table
 )
 @pytest.mark.parametrize("format_version", [1, 2])
 def test_query_filter_null_partitioned(
-    session_catalog: Catalog, spark: SparkSession, arrow_table_with_null: pa.Table, part_col: str, format_version: int
+    session_catalog: Catalog,
+    spark: SparkSession,
+    arrow_table_with_null: pa.Table,
+    part_col: str,
+    format_version: int,
+    test_data_with_null: dict[str, Any],
 ) -> None:
     # Given
     identifier = f"default.arrow_table_v{format_version}_with_null_partitioned_on_col_{part_col}"
@@ -64,7 +70,7 @@ def test_query_filter_null_partitioned(
     assert tbl.format_version == format_version, f"Expected v{format_version}, got: v{tbl.format_version}"
     df = spark.table(identifier)
     assert df.count() == 3, f"Expected 3 total rows for {identifier}"
-    for col in TEST_DATA_WITH_NULL.keys():
+    for col in test_data_with_null.keys():
         assert df.where(f"{col} is not null").count() == 2, f"Expected 2 non-null rows for {col}"
         assert df.where(f"{col} is null").count() == 1, f"Expected 1 null row for {col} is null"
 
@@ -75,7 +81,12 @@ def test_query_filter_null_partitioned(
 )
 @pytest.mark.parametrize("format_version", [1, 2])
 def test_query_filter_without_data_partitioned(
-    session_catalog: Catalog, spark: SparkSession, arrow_table_without_data: pa.Table, part_col: str, format_version: int
+    session_catalog: Catalog,
+    spark: SparkSession,
+    arrow_table_without_data: pa.Table,
+    part_col: str,
+    format_version: int,
+    test_data_with_null: dict[str, Any],
 ) -> None:
     # Given
     identifier = f"default.arrow_table_v{format_version}_without_data_partitioned_on_col_{part_col}"
@@ -96,7 +107,7 @@ def test_query_filter_without_data_partitioned(
     # Then
     assert tbl.format_version == format_version, f"Expected v{format_version}, got: v{tbl.format_version}"
     df = spark.table(identifier)
-    for col in TEST_DATA_WITH_NULL.keys():
+    for col in test_data_with_null.keys():
         assert df.where(f"{col} is null").count() == 0, f"Expected 0 row for {col}"
         assert df.where(f"{col} is not null").count() == 0, f"Expected 0 row for {col}"
 
@@ -107,7 +118,12 @@ def test_query_filter_without_data_partitioned(
 )
 @pytest.mark.parametrize("format_version", [1, 2])
 def test_query_filter_only_nulls_partitioned(
-    session_catalog: Catalog, spark: SparkSession, arrow_table_with_only_nulls: pa.Table, part_col: str, format_version: int
+    session_catalog: Catalog,
+    spark: SparkSession,
+    arrow_table_with_only_nulls: pa.Table,
+    part_col: str,
+    format_version: int,
+    test_data_with_null: dict[str, Any],
 ) -> None:
     # Given
     identifier = f"default.arrow_table_v{format_version}_with_only_nulls_partitioned_on_col_{part_col}"
@@ -128,7 +144,7 @@ def test_query_filter_only_nulls_partitioned(
     # Then
     assert tbl.format_version == format_version, f"Expected v{format_version}, got: v{tbl.format_version}"
     df = spark.table(identifier)
-    for col in TEST_DATA_WITH_NULL.keys():
+    for col in test_data_with_null.keys():
         assert df.where(f"{col} is null").count() == 2, f"Expected 2 row for {col}"
         assert df.where(f"{col} is not null").count() == 0, f"Expected 0 rows for {col}"
 
@@ -139,7 +155,12 @@ def test_query_filter_only_nulls_partitioned(
 )
 @pytest.mark.parametrize("format_version", [1, 2])
 def test_query_filter_appended_null_partitioned(
-    session_catalog: Catalog, spark: SparkSession, arrow_table_with_null: pa.Table, part_col: str, format_version: int
+    session_catalog: Catalog,
+    spark: SparkSession,
+    arrow_table_with_null: pa.Table,
+    part_col: str,
+    format_version: int,
+    test_data_with_null: dict[str, Any],
 ) -> None:
     # Given
     identifier = f"default.arrow_table_v{format_version}_appended_with_null_partitioned_on_col_{part_col}"
@@ -163,7 +184,7 @@ def test_query_filter_appended_null_partitioned(
     # Then
     assert tbl.format_version == format_version, f"Expected v{format_version}, got: v{tbl.format_version}"
     df = spark.table(identifier)
-    for col in TEST_DATA_WITH_NULL.keys():
+    for col in test_data_with_null.keys():
         df = spark.table(identifier)
         assert df.where(f"{col} is not null").count() == 6, f"Expected 6 non-null rows for {col}"
         assert df.where(f"{col} is null").count() == 3, f"Expected 3 null rows for {col}"
@@ -177,7 +198,11 @@ def test_query_filter_appended_null_partitioned(
     "part_col", ['int', 'bool', 'string', "string_long", "long", "float", "double", "date", "timestamptz", "timestamp", "binary"]
 )
 def test_query_filter_v1_v2_append_null(
-    session_catalog: Catalog, spark: SparkSession, arrow_table_with_null: pa.Table, part_col: str
+    session_catalog: Catalog,
+    spark: SparkSession,
+    arrow_table_with_null: pa.Table,
+    part_col: str,
+    test_data_with_null: dict[str, Any],
 ) -> None:
     # Given
     identifier = f"default.arrow_table_v1_v2_appended_with_null_partitioned_on_col_{part_col}"
@@ -207,7 +232,7 @@ def test_query_filter_v1_v2_append_null(
 
     # Then
     assert tbl.format_version == 2, f"Expected v2, got: v{tbl.format_version}"
-    for col in TEST_DATA_WITH_NULL.keys():  # type: ignore
+    for col in test_data_with_null.keys():  # type: ignore
         df = spark.table(identifier)
         assert df.where(f"{col} is not null").count() == 4, f"Expected 4 non-null rows for {col}"
         assert df.where(f"{col} is null").count() == 2, f"Expected 2 null rows for {col}"
