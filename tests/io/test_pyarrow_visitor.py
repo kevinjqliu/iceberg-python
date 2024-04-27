@@ -222,11 +222,13 @@ def test_pyarrow_variable_binary_to_iceberg() -> None:
 
 
 def test_pyarrow_struct_to_iceberg() -> None:
-    pyarrow_struct = pa.struct([
-        pa.field("foo", pa.string(), nullable=True, metadata={"PARQUET:field_id": "1", "doc": "foo doc"}),
-        pa.field("bar", pa.int32(), nullable=False, metadata={"PARQUET:field_id": "2"}),
-        pa.field("baz", pa.bool_(), nullable=True, metadata={"PARQUET:field_id": "3"}),
-    ])
+    pyarrow_struct = pa.struct(
+        [
+            pa.field("foo", pa.string(), nullable=True, metadata={"PARQUET:field_id": "1", "doc": "foo doc"}),
+            pa.field("bar", pa.int32(), nullable=False, metadata={"PARQUET:field_id": "2"}),
+            pa.field("baz", pa.bool_(), nullable=True, metadata={"PARQUET:field_id": "3"}),
+        ]
+    )
     expected = StructType(
         NestedField(field_id=1, name="foo", field_type=StringType(), required=False, doc="foo doc"),
         NestedField(field_id=2, name="bar", field_type=IntegerType(), required=True),
@@ -314,84 +316,94 @@ def test_round_schema_large_string() -> None:
 
 
 def test_simple_schema_has_missing_ids() -> None:
-    schema = pa.schema([
-        pa.field('foo', pa.string(), nullable=False),
-    ])
+    schema = pa.schema(
+        [
+            pa.field('foo', pa.string(), nullable=False),
+        ]
+    )
     visitor = _HasIds()
     has_ids = visit_pyarrow(schema, visitor)
     assert not has_ids
 
 
 def test_simple_schema_has_missing_ids_partial() -> None:
-    schema = pa.schema([
-        pa.field('foo', pa.string(), nullable=False, metadata={"PARQUET:field_id": "1", "doc": "foo doc"}),
-        pa.field('bar', pa.int32(), nullable=False),
-    ])
+    schema = pa.schema(
+        [
+            pa.field('foo', pa.string(), nullable=False, metadata={"PARQUET:field_id": "1", "doc": "foo doc"}),
+            pa.field('bar', pa.int32(), nullable=False),
+        ]
+    )
     visitor = _HasIds()
     has_ids = visit_pyarrow(schema, visitor)
     assert not has_ids
 
 
 def test_nested_schema_has_missing_ids() -> None:
-    schema = pa.schema([
-        pa.field('foo', pa.string(), nullable=False),
-        pa.field(
-            'quux',
-            pa.map_(
-                pa.string(),
-                pa.map_(pa.string(), pa.int32()),
+    schema = pa.schema(
+        [
+            pa.field('foo', pa.string(), nullable=False),
+            pa.field(
+                'quux',
+                pa.map_(
+                    pa.string(),
+                    pa.map_(pa.string(), pa.int32()),
+                ),
+                nullable=False,
             ),
-            nullable=False,
-        ),
-    ])
+        ]
+    )
     visitor = _HasIds()
     has_ids = visit_pyarrow(schema, visitor)
     assert not has_ids
 
 
 def test_nested_schema_has_ids() -> None:
-    schema = pa.schema([
-        pa.field('foo', pa.string(), nullable=False, metadata={"PARQUET:field_id": "1", "doc": "foo doc"}),
-        pa.field(
-            'quux',
-            pa.map_(
-                pa.field("key", pa.string(), nullable=False, metadata={"PARQUET:field_id": "7"}),
-                pa.field(
-                    "value",
-                    pa.map_(
-                        pa.field('key', pa.string(), nullable=False, metadata={"PARQUET:field_id": "9"}),
-                        pa.field('value', pa.int32(), metadata={"PARQUET:field_id": "10"}),
+    schema = pa.schema(
+        [
+            pa.field('foo', pa.string(), nullable=False, metadata={"PARQUET:field_id": "1", "doc": "foo doc"}),
+            pa.field(
+                'quux',
+                pa.map_(
+                    pa.field("key", pa.string(), nullable=False, metadata={"PARQUET:field_id": "7"}),
+                    pa.field(
+                        "value",
+                        pa.map_(
+                            pa.field('key', pa.string(), nullable=False, metadata={"PARQUET:field_id": "9"}),
+                            pa.field('value', pa.int32(), metadata={"PARQUET:field_id": "10"}),
+                        ),
+                        nullable=False,
+                        metadata={"PARQUET:field_id": "8"},
                     ),
-                    nullable=False,
-                    metadata={"PARQUET:field_id": "8"},
                 ),
+                nullable=False,
+                metadata={"PARQUET:field_id": "6", "doc": "quux doc"},
             ),
-            nullable=False,
-            metadata={"PARQUET:field_id": "6", "doc": "quux doc"},
-        ),
-    ])
+        ]
+    )
     visitor = _HasIds()
     has_ids = visit_pyarrow(schema, visitor)
     assert has_ids
 
 
 def test_nested_schema_has_partial_missing_ids() -> None:
-    schema = pa.schema([
-        pa.field('foo', pa.string(), nullable=False, metadata={"PARQUET:field_id": "1", "doc": "foo doc"}),
-        pa.field(
-            'quux',
-            pa.map_(
-                pa.field("key", pa.string(), nullable=False, metadata={"PARQUET:field_id": "7"}),
-                pa.field(
-                    "value",
-                    pa.map_(pa.field('key', pa.string(), nullable=False), pa.field('value', pa.int32())),
-                    nullable=False,
+    schema = pa.schema(
+        [
+            pa.field('foo', pa.string(), nullable=False, metadata={"PARQUET:field_id": "1", "doc": "foo doc"}),
+            pa.field(
+                'quux',
+                pa.map_(
+                    pa.field("key", pa.string(), nullable=False, metadata={"PARQUET:field_id": "7"}),
+                    pa.field(
+                        "value",
+                        pa.map_(pa.field('key', pa.string(), nullable=False), pa.field('value', pa.int32())),
+                        nullable=False,
+                    ),
                 ),
+                nullable=False,
+                metadata={"PARQUET:field_id": "6", "doc": "quux doc"},
             ),
-            nullable=False,
-            metadata={"PARQUET:field_id": "6", "doc": "quux doc"},
-        ),
-    ])
+        ]
+    )
     visitor = _HasIds()
     has_ids = visit_pyarrow(schema, visitor)
     assert not has_ids
@@ -411,11 +423,13 @@ def test_simple_pyarrow_schema_to_schema_missing_ids_using_name_mapping(
     pyarrow_schema_simple_without_ids: pa.Schema, iceberg_schema_simple: Schema
 ) -> None:
     schema = pyarrow_schema_simple_without_ids
-    name_mapping = NameMapping([
-        MappedField(field_id=1, names=['foo']),
-        MappedField(field_id=2, names=['bar']),
-        MappedField(field_id=3, names=['baz']),
-    ])
+    name_mapping = NameMapping(
+        [
+            MappedField(field_id=1, names=['foo']),
+            MappedField(field_id=2, names=['bar']),
+            MappedField(field_id=3, names=['baz']),
+        ]
+    )
 
     assert pyarrow_to_schema(schema, name_mapping) == iceberg_schema_simple
 
@@ -424,9 +438,11 @@ def test_simple_pyarrow_schema_to_schema_missing_ids_using_name_mapping_partial_
     pyarrow_schema_simple_without_ids: pa.Schema,
 ) -> None:
     schema = pyarrow_schema_simple_without_ids
-    name_mapping = NameMapping([
-        MappedField(field_id=1, names=['foo']),
-    ])
+    name_mapping = NameMapping(
+        [
+            MappedField(field_id=1, names=['foo']),
+        ]
+    )
     with pytest.raises(ValueError) as exc_info:
         _ = pyarrow_to_schema(schema, name_mapping)
     assert "Could not find field with name: bar" in str(exc_info.value)
@@ -437,83 +453,89 @@ def test_nested_pyarrow_schema_to_schema_missing_ids_using_name_mapping(
 ) -> None:
     schema = pyarrow_schema_nested_without_ids
 
-    name_mapping = NameMapping([
-        MappedField(field_id=1, names=['foo']),
-        MappedField(field_id=2, names=['bar']),
-        MappedField(field_id=3, names=['baz']),
-        MappedField(field_id=4, names=['qux'], fields=[MappedField(field_id=5, names=['element'])]),
-        MappedField(
-            field_id=6,
-            names=['quux'],
-            fields=[
-                MappedField(field_id=7, names=['key']),
-                MappedField(
-                    field_id=8,
-                    names=['value'],
-                    fields=[
-                        MappedField(field_id=9, names=['key']),
-                        MappedField(field_id=10, names=['value']),
-                    ],
-                ),
-            ],
-        ),
-        MappedField(
-            field_id=11,
-            names=['location'],
-            fields=[
-                MappedField(
-                    field_id=12,
-                    names=['element'],
-                    fields=[
-                        MappedField(field_id=13, names=['latitude']),
-                        MappedField(field_id=14, names=['longitude']),
-                    ],
-                )
-            ],
-        ),
-        MappedField(
-            field_id=15,
-            names=['person'],
-            fields=[
-                MappedField(field_id=16, names=['name']),
-                MappedField(field_id=17, names=['age']),
-            ],
-        ),
-    ])
+    name_mapping = NameMapping(
+        [
+            MappedField(field_id=1, names=['foo']),
+            MappedField(field_id=2, names=['bar']),
+            MappedField(field_id=3, names=['baz']),
+            MappedField(field_id=4, names=['qux'], fields=[MappedField(field_id=5, names=['element'])]),
+            MappedField(
+                field_id=6,
+                names=['quux'],
+                fields=[
+                    MappedField(field_id=7, names=['key']),
+                    MappedField(
+                        field_id=8,
+                        names=['value'],
+                        fields=[
+                            MappedField(field_id=9, names=['key']),
+                            MappedField(field_id=10, names=['value']),
+                        ],
+                    ),
+                ],
+            ),
+            MappedField(
+                field_id=11,
+                names=['location'],
+                fields=[
+                    MappedField(
+                        field_id=12,
+                        names=['element'],
+                        fields=[
+                            MappedField(field_id=13, names=['latitude']),
+                            MappedField(field_id=14, names=['longitude']),
+                        ],
+                    )
+                ],
+            ),
+            MappedField(
+                field_id=15,
+                names=['person'],
+                fields=[
+                    MappedField(field_id=16, names=['name']),
+                    MappedField(field_id=17, names=['age']),
+                ],
+            ),
+        ]
+    )
 
     assert pyarrow_to_schema(schema, name_mapping) == iceberg_schema_nested
 
 
 def test_pyarrow_schema_to_schema_missing_ids_using_name_mapping_nested_missing_id() -> None:
-    schema = pa.schema([
-        pa.field('foo', pa.string(), nullable=False),
-        pa.field(
-            'quux',
-            pa.map_(
-                pa.string(),
-                pa.map_(pa.string(), pa.int32()),
-            ),
-            nullable=False,
-        ),
-    ])
-
-    name_mapping = NameMapping([
-        MappedField(field_id=1, names=['foo']),
-        MappedField(
-            field_id=6,
-            names=['quux'],
-            fields=[
-                MappedField(field_id=7, names=['key']),
-                MappedField(
-                    field_id=8,
-                    names=['value'],
-                    fields=[
-                        MappedField(field_id=10, names=['value']),
-                    ],
+    schema = pa.schema(
+        [
+            pa.field('foo', pa.string(), nullable=False),
+            pa.field(
+                'quux',
+                pa.map_(
+                    pa.string(),
+                    pa.map_(pa.string(), pa.int32()),
                 ),
-            ],
-        ),
-    ])
+                nullable=False,
+            ),
+        ]
+    )
+
+    name_mapping = NameMapping(
+        [
+            MappedField(field_id=1, names=['foo']),
+            MappedField(
+                field_id=6,
+                names=['quux'],
+                fields=[
+                    MappedField(field_id=7, names=['key']),
+                    MappedField(
+                        field_id=8,
+                        names=['value'],
+                        fields=[
+                            MappedField(field_id=10, names=['value']),
+                        ],
+                    ),
+                ],
+            ),
+        ]
+    )
     with pytest.raises(ValueError) as exc_info:
         _ = pyarrow_to_schema(schema, name_mapping)
     assert "Could not find field with name: quux.value.key" in str(exc_info.value)

@@ -210,12 +210,14 @@ def test_write_pyarrow_schema(catalog: SqlCatalog, random_identifier: Identifier
             pa.array([True, None, False, True]),  # 'baz' column
             pa.array([None, "A", "B", "C"]),  # 'large' column
         ],
-        schema=pa.schema([
-            pa.field('foo', pa.string(), nullable=True),
-            pa.field('bar', pa.int32(), nullable=False),
-            pa.field('baz', pa.bool_(), nullable=True),
-            pa.field('large', pa.large_string(), nullable=True),
-        ]),
+        schema=pa.schema(
+            [
+                pa.field('foo', pa.string(), nullable=True),
+                pa.field('bar', pa.int32(), nullable=False),
+                pa.field('baz', pa.bool_(), nullable=True),
+                pa.field('large', pa.large_string(), nullable=True),
+            ]
+        ),
     )
     database_name, _table_name = random_identifier
     catalog.create_namespace(database_name)
@@ -933,10 +935,12 @@ def test_write_and_evolve(catalog: SqlCatalog, format_version: int) -> None:
             'foo': ['a', None, 'z'],
             'bar': [19, None, 25],
         },
-        schema=pa.schema([
-            pa.field("foo", pa.string(), nullable=True),
-            pa.field("bar", pa.int32(), nullable=True),
-        ]),
+        schema=pa.schema(
+            [
+                pa.field("foo", pa.string(), nullable=True),
+                pa.field("bar", pa.int32(), nullable=True),
+            ]
+        ),
     )
 
     with tbl.transaction() as txn:

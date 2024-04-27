@@ -45,12 +45,14 @@ TABLE_SCHEMA = Schema(
     NestedField(field_id=10, name="qux", field_type=DateType(), required=False),
 )
 
-ARROW_SCHEMA = pa.schema([
-    ("foo", pa.bool_()),
-    ("bar", pa.string()),
-    ("baz", pa.int32()),
-    ("qux", pa.date32()),
-])
+ARROW_SCHEMA = pa.schema(
+    [
+        ("foo", pa.bool_()),
+        ("bar", pa.string()),
+        ("baz", pa.int32()),
+        ("qux", pa.date32()),
+    ]
+)
 
 ARROW_TABLE = pa.Table.from_pylist(
     [
@@ -64,12 +66,14 @@ ARROW_TABLE = pa.Table.from_pylist(
     schema=ARROW_SCHEMA,
 )
 
-ARROW_SCHEMA_WITH_IDS = pa.schema([
-    pa.field('foo', pa.bool_(), nullable=False, metadata={"PARQUET:field_id": "1"}),
-    pa.field('bar', pa.string(), nullable=False, metadata={"PARQUET:field_id": "2"}),
-    pa.field('baz', pa.int32(), nullable=False, metadata={"PARQUET:field_id": "3"}),
-    pa.field('qux', pa.date32(), nullable=False, metadata={"PARQUET:field_id": "4"}),
-])
+ARROW_SCHEMA_WITH_IDS = pa.schema(
+    [
+        pa.field('foo', pa.bool_(), nullable=False, metadata={"PARQUET:field_id": "1"}),
+        pa.field('bar', pa.string(), nullable=False, metadata={"PARQUET:field_id": "2"}),
+        pa.field('baz', pa.int32(), nullable=False, metadata={"PARQUET:field_id": "3"}),
+        pa.field('qux', pa.date32(), nullable=False, metadata={"PARQUET:field_id": "4"}),
+    ]
+)
 
 
 ARROW_TABLE_WITH_IDS = pa.Table.from_pylist(
@@ -84,12 +88,14 @@ ARROW_TABLE_WITH_IDS = pa.Table.from_pylist(
     schema=ARROW_SCHEMA_WITH_IDS,
 )
 
-ARROW_SCHEMA_UPDATED = pa.schema([
-    ("foo", pa.bool_()),
-    ("baz", pa.int32()),
-    ("qux", pa.date32()),
-    ("quux", pa.int32()),
-])
+ARROW_SCHEMA_UPDATED = pa.schema(
+    [
+        ("foo", pa.bool_()),
+        ("baz", pa.int32()),
+        ("qux", pa.date32()),
+        ("quux", pa.int32()),
+    ]
+)
 
 ARROW_TABLE_UPDATED = pa.Table.from_pylist(
     [

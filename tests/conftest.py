@@ -323,49 +323,57 @@ def table_schema_with_all_types() -> Schema:
 def pyarrow_schema_simple_without_ids() -> "pa.Schema":
     import pyarrow as pa
 
-    return pa.schema([
-        pa.field('foo', pa.string(), nullable=True),
-        pa.field('bar', pa.int32(), nullable=False),
-        pa.field('baz', pa.bool_(), nullable=True),
-    ])
+    return pa.schema(
+        [
+            pa.field('foo', pa.string(), nullable=True),
+            pa.field('bar', pa.int32(), nullable=False),
+            pa.field('baz', pa.bool_(), nullable=True),
+        ]
+    )
 
 
 @pytest.fixture(scope="session")
 def pyarrow_schema_nested_without_ids() -> "pa.Schema":
     import pyarrow as pa
 
-    return pa.schema([
-        pa.field('foo', pa.string(), nullable=False),
-        pa.field('bar', pa.int32(), nullable=False),
-        pa.field('baz', pa.bool_(), nullable=True),
-        pa.field('qux', pa.list_(pa.string()), nullable=False),
-        pa.field(
-            'quux',
-            pa.map_(
-                pa.string(),
-                pa.map_(pa.string(), pa.int32()),
+    return pa.schema(
+        [
+            pa.field('foo', pa.string(), nullable=False),
+            pa.field('bar', pa.int32(), nullable=False),
+            pa.field('baz', pa.bool_(), nullable=True),
+            pa.field('qux', pa.list_(pa.string()), nullable=False),
+            pa.field(
+                'quux',
+                pa.map_(
+                    pa.string(),
+                    pa.map_(pa.string(), pa.int32()),
+                ),
+                nullable=False,
             ),
-            nullable=False,
-        ),
-        pa.field(
-            'location',
-            pa.list_(
-                pa.struct([
-                    pa.field('latitude', pa.float32(), nullable=False),
-                    pa.field('longitude', pa.float32(), nullable=False),
-                ]),
+            pa.field(
+                'location',
+                pa.list_(
+                    pa.struct(
+                        [
+                            pa.field('latitude', pa.float32(), nullable=False),
+                            pa.field('longitude', pa.float32(), nullable=False),
+                        ]
+                    ),
+                ),
+                nullable=False,
             ),
-            nullable=False,
-        ),
-        pa.field(
-            'person',
-            pa.struct([
-                pa.field('name', pa.string(), nullable=True),
-                pa.field('age', pa.int32(), nullable=False),
-            ]),
-            nullable=True,
-        ),
-    ])
+            pa.field(
+                'person',
+                pa.struct(
+                    [
+                        pa.field('name', pa.string(), nullable=True),
+                        pa.field('age', pa.int32(), nullable=False),
+                    ]
+                ),
+                nullable=True,
+            ),
+        ]
+    )
 
 
 @pytest.fixture(scope="session")
@@ -2101,26 +2109,28 @@ TEST_DATA_WITH_NULL = {
 def pa_schema() -> "pa.Schema":
     import pyarrow as pa
 
-    return pa.schema([
-        ("bool", pa.bool_()),
-        ("string", pa.string()),
-        ("string_long", pa.string()),
-        ("int", pa.int32()),
-        ("long", pa.int64()),
-        ("float", pa.float32()),
-        ("double", pa.float64()),
-        # Not supported by Spark
-        # ("time", pa.time64('us')),
-        ("timestamp", pa.timestamp(unit="us")),
-        ("timestamptz", pa.timestamp(unit="us", tz="UTC")),
-        ("date", pa.date32()),
-        # Not supported by Spark
-        # ("time", pa.time64("us")),
-        # Not natively supported by Arrow
-        # ("uuid", pa.fixed(16)),
-        ("binary", pa.large_binary()),
-        ("fixed", pa.binary(16)),
-    ])
+    return pa.schema(
+        [
+            ("bool", pa.bool_()),
+            ("string", pa.string()),
+            ("string_long", pa.string()),
+            ("int", pa.int32()),
+            ("long", pa.int64()),
+            ("float", pa.float32()),
+            ("double", pa.float64()),
+            # Not supported by Spark
+            # ("time", pa.time64('us')),
+            ("timestamp", pa.timestamp(unit="us")),
+            ("timestamptz", pa.timestamp(unit="us", tz="UTC")),
+            ("date", pa.date32()),
+            # Not supported by Spark
+            # ("time", pa.time64("us")),
+            # Not natively supported by Arrow
+            # ("uuid", pa.fixed(16)),
+            ("binary", pa.large_binary()),
+            ("fixed", pa.binary(16)),
+        ]
+    )
 
 
 @pytest.fixture(scope="session")
