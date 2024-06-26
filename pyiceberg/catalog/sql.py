@@ -556,6 +556,8 @@ class SqlCatalog(MetastoreCatalog):
                     )
                 )
                 session.commit()
+        else:
+            raise NoSuchNamespaceError(f"Namespace does not exist: {namespace}")
 
     def list_tables(self, namespace: Union[str, Identifier]) -> List[Identifier]:
         """List tables under the given namespace in the catalog.
@@ -678,6 +680,6 @@ class SqlCatalog(MetastoreCatalog):
                     insert_stmt = insert_stmt.values(
                         catalog_name=self.name, namespace=namespace_str, property_key=property_key, property_value=property_value
                     )
-                session.execute(insert_stmt)
+                    session.execute(insert_stmt)
             session.commit()
         return properties_update_summary
