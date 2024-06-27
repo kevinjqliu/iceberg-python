@@ -883,9 +883,10 @@ def _(update: AddSchemaUpdate, base_metadata: TableMetadata, context: _TableMeta
     if update.last_column_id < base_metadata.last_column_id:
         raise ValueError(f"Invalid last column id {update.last_column_id}, must be >= {base_metadata.last_column_id}")
 
+    is_empty_schema = len(base_metadata.schemas) == 1 and base_metadata.schemas[0] == Schema()
     metadata_updates: Dict[str, Any] = {
         "last_column_id": update.last_column_id,
-        "schemas": [update.schema_] if update.initial_change else base_metadata.schemas + [update.schema_],
+        "schemas": [update.schema_] if update.initial_change or is_empty_schema else base_metadata.schemas + [update.schema_],
     }
 
     context.add_update(update)
@@ -914,6 +915,11 @@ def _(update: SetCurrentSchemaUpdate, base_metadata: TableMetadata, context: _Ta
 
 @_apply_table_update.register(AddPartitionSpecUpdate)
 def _(update: AddPartitionSpecUpdate, base_metadata: TableMetadata, context: _TableMetadataUpdateContext) -> TableMetadata:
+    context.add_update(update)
+    if update.spec.spec_id == INITIAL_PARTITION_SPEC_ID:
+        # no op
+        return base_metadata
+
     for spec in base_metadata.partition_specs:
         if spec.spec_id == update.spec.spec_id and not update.initial_change:
             raise ValueError(f"Partition spec with id {spec.spec_id} already exists: {spec}")
@@ -926,7 +932,6 @@ def _(update: AddPartitionSpecUpdate, base_metadata: TableMetadata, context: _Ta
         ),
     }
 
-    context.add_update(update)
     return base_metadata.model_copy(update=metadata_updates)
 
 
@@ -1025,6 +1030,9 @@ def _(update: SetSnapshotRefUpdate, base_metadata: TableMetadata, context: _Tabl
 @_apply_table_update.register(AddSortOrderUpdate)
 def _(update: AddSortOrderUpdate, base_metadata: TableMetadata, context: _TableMetadataUpdateContext) -> TableMetadata:
     context.add_update(update)
+    if update.sort_order == UNSORTED_SORT_ORDER:
+        # no op
+        return base_metadata
     return base_metadata.model_copy(
         update={
             "sort_orders": [update.sort_order] if update.initial_change else base_metadata.sort_orders + [update.sort_order],
