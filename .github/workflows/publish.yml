@@ -7,15 +7,12 @@ on:
 jobs:
   pypi-publish:
     name: Publish release to PyPI
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     environment:
       name: pypi
       url: https://pypi.org/p/pyiceberg-kevinliu
     permissions:
       id-token: write
-    strategy:
-      matrix:
-        os: [ ubuntu-22.04, windows-2022, macos-11, macos-12, macos-13, macos-14 ]
 
     steps:
       - uses: actions/checkout@v4
@@ -37,7 +34,7 @@ jobs:
       # the repository, otherwise the tests will fail
       - name: Compile source distribution
         run: python3 -m poetry build --format=sdist
-        if: startsWith(matrix.os, 'ubuntu')
+        # if: startsWith(matrix.os, 'ubuntu')
 
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.19.2
@@ -57,14 +54,14 @@ jobs:
           # and would require a local rust build chain
           CIBW_TEST_SKIP: "pp* *macosx*"
 
-      - name: Add source distribution
-        if: startsWith(matrix.os, 'ubuntu')
-        run: ls -lah dist/* && cp dist/* wheelhouse/
+      # - name: Add source distribution
+      #   if: startsWith(matrix.os, 'ubuntu')
+      #   run: ls -lah dist/* && cp dist/* wheelhouse/
 
-      - uses: actions/upload-artifact@v3
-        with:
-          name: "release-${{ github.event.inputs.version }}"
-          path: ./wheelhouse/*
+      # - uses: actions/upload-artifact@v3
+      #   with:
+      #     name: "release-${{ github.event.inputs.version }}"
+      #     path: ./wheelhouse/*
 
       - name: Publish package distributions to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
