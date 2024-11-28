@@ -1,0 +1,71 @@
+name: Test Automate Workflow
+
+on:
+  workflow_dispatch:
+
+jobs:
+  gpg-test:
+    runs-on: ubuntu-latest
+    steps:
+      # Create a test file
+      - name: Create Test File
+        run: echo "This is a test file for GPG signing" > test-file.txt
+
+      # Create a SHA-512 checksum file
+      - name: Create SHA-512 Checksum File
+        run: |
+          name="test-file.txt"
+          shasum -a 512 "${name}" > "${name}.sha512"
+
+      # Verify the SHA-512 checksum
+      - name: Verify the SHA-512 Checksum
+        run: |
+          name="test-file.txt"
+          shasum -a 512 --check "${name}.sha512"
+
+      # Import GPG key using crazy-max/ghaction-import-gpg
+      - name: Import GPG Key
+        id: import_gpg
+        uses: crazy-max/ghaction-import-gpg@111c56156bcc6918c056dbef52164cfa583dc549
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+
+      # Sign the file using the provided GPG command
+      - name: Detach Sign the File
+        run: |
+          name="test-file.txt"
+          gpg --yes --armor --output "${name}.asc" --detach-sig "${name}"
+
+      # Verify the detached signature
+      - name: Verify the Detached Signature
+        run: |
+          name="test-file.txt"
+          gpg --verify "${name}.asc" "${name}"
+
+      # Run SVN Steps
+      - name: Perform SVN Operations
+        env:
+          RC: rc1
+          VERSION: 0.7.0rc1
+          VERSION_WITHOUT_RC: 0.7.0
+          VERSION_BRANCH: 0-7-0
+        run: |
+          export RC=rc1
+          export VERSION=0.7.0${RC}
+          export VERSION_WITHOUT_RC=${VERSION/rc?/}
+          export VERSION_BRANCH=${VERSION_WITHOUT_RC//./-}
+
+          echo "RC: $RC"
+          echo "VERSION: $VERSION"
+          echo "VERSION_WITHOUT_RC: $VERSION_WITHOUT_RC"
+          echo "VERSION_BRANCH: $VERSION_BRANCH"
+
+          export SVN_TMP_DIR=/tmp/iceberg-${VERSION_BRANCH}/
+          svn checkout https://dist.apache.org/repos/dist/dev/iceberg $SVN_TMP_DIR
+
+          # export SVN_TMP_DIR_VERSIONED=${SVN_TMP_DIR}pyiceberg-$VERSION/
+          # mkdir -p $SVN_TMP_DIR_VERSIONED
+          # cp * $SVN_TMP_DIR_VERSIONED
+          # svn add $SVN_TMP_DIR_VERSIONED
+          # svn ci -m "PyIceberg ${VERSION}" ${SVN_TMP_DIR_VERSIONED}
