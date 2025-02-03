@@ -25,11 +25,38 @@ on:
   workflow_dispatch:  # Allows manual triggering
 
 jobs:
+  set-version:
+    runs-on: ubuntu-latest
+    outputs:
+      VERSION: ${{ steps.set-version.outputs.VERSION }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: 3.12
+
+      - name: Install Poetry
+        run: make install-poetry
+
+      - name: Extract version from Poetry
+        id: set-version
+        run: |
+          CURRENT_VERSION=$(poetry version --short)
+          VERSION="${CURRENT_VERSION}+nightly.$(date +%Y%m%d)"
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Debug version
+        run: echo "Publishing version ${{ steps.set-version.outputs.VERSION }}"
+
   nightly-build:
-    uses: ./.github/workflows/pypi-build-artifacts.yml  # Reference the PyPI build workflow
+    needs: set-version
+    uses: ./.github/workflows/pypi-build-artifacts.yml
     with:
-      VERSION: "0.0.0"  # Generate nightly version
-      RC: "1"  # Reset RC for nightly builds
+      version: ${{ needs.set-version.outputs.VERSION }}
+      rc: "0"  # Reset RC for nightly builds
 
   testpypi-publish:
     name: Publish to TestPypi
