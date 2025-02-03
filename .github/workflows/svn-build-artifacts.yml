@@ -59,12 +59,15 @@ jobs:
         run: python3 -m poetry build --format=sdist
         if: startsWith(matrix.os, 'ubuntu')
 
+      - uses: astral-sh/setup-uv@v4 # required to use `uv` in cibuildwheel
+
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.22.0
         with:
           output-dir: wheelhouse
           config-file: "pyproject.toml"
         env:
+          CIBW_BUILD_FRONTEND: "build[uv]"
           # Ignore 32 bit architectures
           CIBW_ARCHS: "auto64"
           CIBW_PROJECT_REQUIRES_PYTHON: ">=3.9,<3.13"
