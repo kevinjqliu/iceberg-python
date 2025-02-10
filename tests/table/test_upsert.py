@@ -14,32 +14,19 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+from typing import Generator
+
+import pyarrow as pa
 import pytest
 from datafusion import SessionContext
 
-from tests.catalog.test_base import InMemoryCatalog
+from pyiceberg.catalog import Catalog
+from pyiceberg.table import Table, UpsertResult
 
 _TEST_NAMESPACE = "test_ns"
 
 
-def show_iceberg_table(table, ctx: SessionContext):
-    import pyarrow.dataset as ds
-
-    table_name = "target"
-    if ctx.table_exist(table_name):
-        ctx.deregister_table(table_name)
-    ctx.register_dataset(table_name, ds.dataset(table.scan().to_arrow()))
-    ctx.sql(f"SELECT * FROM {table_name} limit 5").show()
-
-
-def show_df(df, ctx: SessionContext):
-    import pyarrow.dataset as ds
-
-    ctx.register_dataset("df", ds.dataset(df))
-    ctx.sql("select * from df limit 10").show()
-
-
-def gen_source_dataset(start_row: int, end_row: int, composite_key: bool, add_dup: bool, ctx: SessionContext):
+def gen_source_dataset(start_row: int, end_row: int, composite_key: bool, add_dup: bool, ctx: SessionContext) -> pa.Table:
     additional_columns = ", t.order_id + 1000 as order_line_id" if composite_key else ""
 
     dup_row = (
@@ -70,8 +57,8 @@ def gen_source_dataset(start_row: int, end_row: int, composite_key: bool, add_du
 
 
 def gen_target_iceberg_table(
-    start_row: int, end_row: int, composite_key: bool, ctx: SessionContext, catalog: InMemoryCatalog, namespace: str
-):
+    start_row: int, end_row: int, composite_key: bool, ctx: SessionContext, catalog: Catalog, namespace: str
+) -> Table:
     additional_columns = ", t.order_id + 1000 as order_line_id" if composite_key else ""
 
     df = ctx.sql(f"""
@@ -88,13 +75,15 @@ def gen_target_iceberg_table(
     return table
 
 
-def assert_upsert_result(res, expected_updated, expected_inserted):
+def assert_upsert_result(res: UpsertResult, expected_updated: int, expected_inserted: int) -> None:
     assert res.rows_updated == expected_updated, f"rows updated should be {expected_updated}, but got {res.rows_updated}"
     assert res.rows_inserted == expected_inserted, f"rows inserted should be {expected_inserted}, but got {res.rows_inserted}"
 
 
 @pytest.fixture(scope="session")
-def catalog_conn():
+def catalog_conn() -> Generator[Catalog]:
+    from pyiceberg.catalog.memory import InMemoryCatalog
+
     catalog = InMemoryCatalog("test")
     catalog.create_namespace(namespace=_TEST_NAMESPACE)
     yield catalog
@@ -110,17 +99,17 @@ def catalog_conn():
     ],
 )
 def test_merge_rows(
-    catalog_conn,
-    join_cols,
-    src_start_row,
-    src_end_row,
-    target_start_row,
-    target_end_row,
-    when_matched_update_all,
-    when_not_matched_insert_all,
-    expected_updated,
-    expected_inserted,
-):
+    catalog_conn: Catalog,
+    join_cols: list[str],
+    src_start_row: int,
+    src_end_row: int,
+    target_start_row: int,
+    target_end_row: int,
+    when_matched_update_all: bool,
+    when_not_matched_insert_all: bool,
+    expected_updated: int,
+    expected_inserted: int,
+) -> None:
     ctx = SessionContext()
 
     catalog = catalog_conn
@@ -139,7 +128,7 @@ def test_merge_rows(
     catalog.drop_table(f"{_TEST_NAMESPACE}.target")
 
 
-def test_merge_scenario_skip_upd_row(catalog_conn):
+def test_merge_scenario_skip_upd_row(catalog_conn: Catalog) -> None:
     """
     tests a single insert and update; skips a row that does not need to be updated
     """
@@ -175,7 +164,7 @@ def test_merge_scenario_skip_upd_row(catalog_conn):
     catalog.drop_table(f"{_TEST_NAMESPACE}.target")
 
 
-def test_merge_scenario_date_as_key(catalog_conn):
+def test_merge_scenario_date_as_key(catalog_conn: Catalog) -> None:
     """
     tests a single insert and update; primary key is a date column
     """
@@ -211,7 +200,7 @@ def test_merge_scenario_date_as_key(catalog_conn):
     catalog.drop_table(f"{_TEST_NAMESPACE}.target")
 
 
-def test_merge_scenario_string_as_key(catalog_conn):
+def test_merge_scenario_string_as_key(catalog_conn: Catalog) -> None:
     """
     tests a single insert and update; primary key is a string column
     """
@@ -247,7 +236,7 @@ def test_merge_scenario_string_as_key(catalog_conn):
     catalog.drop_table(f"{_TEST_NAMESPACE}.target")
 
 
-def test_merge_scenario_composite_key(catalog_conn):
+def test_merge_scenario_composite_key(catalog_conn: Catalog) -> None:
     """
     tests merging 200 rows with a composite key
     """
@@ -268,7 +257,7 @@ def test_merge_scenario_composite_key(catalog_conn):
     catalog.drop_table(f"{_TEST_NAMESPACE}.target")
 
 
-def test_merge_source_dups(catalog_conn):
+def test_merge_source_dups(catalog_conn: Catalog) -> None:
     """
     tests duplicate rows in source
     """
@@ -285,7 +274,7 @@ def test_merge_source_dups(catalog_conn):
     catalog.drop_table(f"{_TEST_NAMESPACE}.target")
 
 
-def test_key_cols_misaligned(catalog_conn):
+def test_key_cols_misaligned(catalog_conn: Catalog) -> None:
     """
     tests join columns missing from one of the tables
     """

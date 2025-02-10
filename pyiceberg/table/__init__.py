@@ -152,7 +152,7 @@ DOWNCAST_NS_TIMESTAMP_TO_US_ON_WRITE = "downcast-ns-timestamp-to-us-on-write"
 
 @dataclass()
 class UpsertResult:
-    """Summary the upsert operation"""
+    """Summary the upsert operation."""
 
     rows_updated: int = 0
     rows_inserted: int = 0
@@ -1095,7 +1095,7 @@ class Table:
         return self.metadata.name_mapping()
 
     def upsert(
-        self, df: pa.Table, join_cols: list, when_matched_update_all: bool = True, when_not_matched_insert_all: bool = True
+        self, df: pa.Table, join_cols: list[str], when_matched_update_all: bool = True, when_not_matched_insert_all: bool = True
     ) -> UpsertResult:
         """
         Shorthand API for performing an upsert to an iceberg table.
@@ -1128,7 +1128,6 @@ class Table:
 
         Returns: a UpsertResult class (contains details of rows updated and inserted)
         """
-
         from pyiceberg.table import upsert_util
 
         if not when_matched_update_all and not when_not_matched_insert_all:

@@ -15,7 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 import pyarrow as pa
-from pyarrow import Table as pyarrow_table
 from pyarrow import compute as pc
 
 from pyiceberg.expressions import (
@@ -27,7 +26,7 @@ from pyiceberg.expressions import (
 )
 
 
-def create_match_filter(df: pyarrow_table, join_cols: list) -> BooleanExpression:
+def create_match_filter(df: pa.Table, join_cols: list[str]) -> BooleanExpression:
     unique_keys = df.select(join_cols).group_by(join_cols).aggregate([])
 
     if len(join_cols) == 1:
@@ -36,20 +35,13 @@ def create_match_filter(df: pyarrow_table, join_cols: list) -> BooleanExpression
         return Or(*[And(*[EqualTo(col, row[col]) for col in join_cols]) for row in unique_keys.to_pylist()])
 
 
-def has_duplicate_rows(df: pyarrow_table, join_cols: list) -> bool:
-    """
-    This function checks if there are duplicate rows in in a pyarrow table based on the join columns.
-    """
-
+def has_duplicate_rows(df: pa.Table, join_cols: list[str]) -> bool:
+    """Check if there are duplicate rows in in a pyarrow table based on the join columns."""
     return len(df.select(join_cols).group_by(join_cols).aggregate([([], "count_all")]).filter(pc.field("count_all") > 1)) > 0
 
 
-def get_rows_to_update(source_table: pa.Table, target_table: pa.Table, join_cols: list) -> pa.Table:
-    """
-    This function takes the source_table, trims it down to rows that match in both source and target.
-    It then does a scan for the non-key columns to see if any are mis-aligned before returning the final row set to update
-    """
-
+def get_rows_to_update(source_table: pa.Table, target_table: pa.Table, join_cols: list[str]) -> pa.Table:
+    """Find rows in source_table that have matching join_cols in target_table but differing non-key column values."""
     all_columns = set(source_table.column_names)
     join_cols_set = set(join_cols)
 
