@@ -2432,7 +2432,7 @@ def spark() -> "SparkSession":
 
     spark = (
         SparkSession.builder.appName("PyIceberg integration test")
-        .config('spark.jars.repositories', 'https://repository.apache.org/content/repositories/orgapacheiceberg-1182/')
+        .config("spark.jars.repositories", "https://repository.apache.org/content/repositories/orgapacheiceberg-1182/")
         .config("spark.sql.session.timeZone", "UTC")
         .config("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
         .config("spark.sql.catalog.integration", "org.apache.iceberg.spark.SparkCatalog")
