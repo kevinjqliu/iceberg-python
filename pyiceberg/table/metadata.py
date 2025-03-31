@@ -241,7 +241,9 @@ class TableMetadataCommonFields(IcebergBaseModel):
 
     def name_mapping(self) -> Optional[NameMapping]:
         """Return the table's field-id NameMapping."""
-        if name_mapping_json := self.properties.get("schema.name-mapping.default"):
+        from pyiceberg.table import TableProperties
+
+        if name_mapping_json := self.properties.get(TableProperties.DEFAULT_NAME_MAPPING):
             return parse_mapping_from_json(name_mapping_json)
         else:
             return None
