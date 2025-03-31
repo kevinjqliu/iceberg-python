@@ -2317,3 +2317,31 @@ def test_pyarrow_io_multi_fs() -> None:
 
         # Same PyArrowFileIO instance resolves local file input to LocalFileSystem
         assert isinstance(pyarrow_file_io.new_input("file:///path/to/file")._filesystem, LocalFileSystem)
+
+
+def test_scan_subset_of_schema(catalog: InMemoryCatalog) -> None:
+    pyarrow_schema = pa.schema(
+        [
+            pa.field("foo", pa.string()),
+            pa.field("bar", pa.list_(pa.string())),
+        ]
+    )
+    catalog.create_namespace_if_not_exists("test")
+    tbl = catalog.create_table_if_not_exists("test.test_scan_subset_of_schema", pyarrow_schema)
+
+    arrow_table = pa.Table.from_pylist(
+        [
+            {"foo": "one", "bar": ["1"]},
+            {"foo": "two", "bar": ["2"]},
+        ]
+    )
+    tbl.append(arrow_table)
+
+    subset_arrow_table = pa.Table.from_pylist(
+        [  # without bar
+            {"foo": "three"},
+            {"foo": "four"},
+        ],
+    )
+    tbl.append(subset_arrow_table)
+    assert len(tbl.scan().to_arrow()) == 4

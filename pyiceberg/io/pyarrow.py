@@ -1652,7 +1652,7 @@ class ArrowScan:
                 self._projected_field_ids,
                 deletes_per_file.get(task.file.file_path),
                 self._case_sensitive,
-                self._table_metadata.name_mapping(),
+                self._table_metadata.schema().name_mapping,
                 self._table_metadata.spec(),
             )
             for batch in batches:
