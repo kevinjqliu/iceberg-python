@@ -299,6 +299,7 @@ def test_fsspec_new_input_file_adls(adls_fsspec_fileio: FsspecFileIO) -> None:
 
     assert isinstance(input_file, fsspec.FsspecInputFile)
     assert input_file.location == f"abfss://tests/{filename}"
+    raise AssertionError
 
 
 @pytest.mark.adls
