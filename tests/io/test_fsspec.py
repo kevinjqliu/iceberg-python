@@ -293,6 +293,7 @@ def test_fsspec_unified_session_properties() -> None:
 @pytest.mark.adls
 def test_fsspec_new_input_file_adls(adls_fsspec_fileio: FsspecFileIO) -> None:
     """Test creating a new input file from an fsspec file-io"""
+    assert False, "This should fail CI"
     filename = str(uuid.uuid4())
 
     input_file = adls_fsspec_fileio.new_input(f"abfss://tests/{filename}")
