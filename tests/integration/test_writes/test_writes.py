@@ -1211,7 +1211,7 @@ def test_sanitize_character_partitioned_avro_bug(catalog: Catalog) -> None:
         pass
 
     schema = Schema(
-        NestedField(id=1, name="😎", field_type=IntegerType(), required=False),
+        NestedField(id=1, name="😎", field_type=StringType(), required=False),
     )
 
     partition_spec = PartitionSpec(
@@ -1228,7 +1228,11 @@ def test_sanitize_character_partitioned_avro_bug(catalog: Catalog) -> None:
         identifier=table_name,
         schema=schema,
         partition_spec=partition_spec,
-        data=[pa.Table.from_arrays([range(22)], schema=pa.schema([pa.field("😎", pa.int32(), nullable=False)]))],
+        data=[
+            pa.Table.from_arrays(
+                [pa.array([str(i) for i in range(22)])], schema=pa.schema([pa.field("😎", pa.string(), nullable=False)])
+            )
+        ],
     )
 
     assert len(tbl.scan().to_arrow()) == 22
@@ -1237,7 +1241,7 @@ def test_sanitize_character_partitioned_avro_bug(catalog: Catalog) -> None:
     result = con.query("SELECT * FROM table_test_debug").fetchall()
     assert len(result) == 22
 
-    assert con.query("SHOW table_test_debug").fetchone() == ("😎", "INTEGER", "YES", None, None, None)
+    assert con.query("SHOW table_test_debug").fetchone() == ("😎", "VARCHAR", "YES", None, None, None)
 
 
 @pytest.mark.integration
