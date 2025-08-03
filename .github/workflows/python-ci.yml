@@ -64,6 +64,12 @@ jobs:
       run: make install-dependencies
     - name: Run linters
       run: make lint
+    - name: Check if .so file exists
+      run: ls -lh pyiceberg/avro/
+    - name: Print PYTHONPATH and files
+      run: |
+        echo $PYTHONPATH
+        find . -name "decoder_fast*"
     - name: Run unit tests with coverage
       run: COVERAGE=1 make test
     - name: Generate coverage report (85%) # Coverage threshold should only increase over time — never decrease it!
