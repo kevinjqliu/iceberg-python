@@ -48,12 +48,12 @@ help: ## Display this help message
 install-poetry: ## Ensure Poetry is installed at the specified version
 	@if ! command -v poetry &> /dev/null; then \
 		echo "Poetry not found. Installing..."; \
-		pip install --user poetry==$(POETRY_VERSION); \
+		python -m pip install --user poetry==$(POETRY_VERSION); \
 	else \
-		INSTALLED_VERSION=$$(pip show poetry | grep Version | awk '{print $$2}'); \
+		INSTALLED_VERSION=$$(python -m pip show poetry | grep Version | awk '{print $$2}'); \
 		if [ "$$INSTALLED_VERSION" != "$(POETRY_VERSION)" ]; then \
 			echo "Updating Poetry to version $(POETRY_VERSION)..."; \
-			pip install --user --upgrade poetry==$(POETRY_VERSION); \
+			python -m pip install --user --upgrade poetry==$(POETRY_VERSION); \
 		else \
 			echo "Poetry version $(POETRY_VERSION) already installed."; \
 		fi; \
