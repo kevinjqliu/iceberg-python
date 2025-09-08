@@ -32,6 +32,7 @@ spark = (
         .builder
         .config("spark.sql.shuffle.partitions", "1")
         .config("spark.default.parallelism", "1")
+        .config("spark.sql.ansi.enabled", "false")
         .getOrCreate()
 )
 

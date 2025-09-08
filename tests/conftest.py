@@ -2535,7 +2535,7 @@ def spark() -> "SparkSession":
     spark_version = ".".join(importlib.metadata.version("pyspark").split(".")[:2])
     scala_version = "2.13"
     iceberg_version = "1.10.0"
-    hadoop_version = "3.3.4"
+    hadoop_version = "3.3.6"
     aws_sdk_version = "1.12.753"
 
     os.environ["PYSPARK_SUBMIT_ARGS"] = (
@@ -2577,6 +2577,11 @@ def spark() -> "SparkSession":
         .config("spark.sql.catalog.spark_catalog.warehouse", "s3://warehouse/hive/")
         .config("spark.hadoop.fs.s3a.endpoint", "http://localhost:9000")
         .config("spark.hadoop.fs.s3a.path.style.access", "true")
+        .config("spark.hadoop.fs.s3a.threads.keepalivetime", "60000")
+        .config("spark.hadoop.fs.s3a.connection.establish.timeout", "30000")
+        .config("spark.hadoop.fs.s3a.connection.timeout", "200000")
+        .config("spark.hadoop.fs.s3a.multipart.purge.age", str(24 * 60 * 60))
+        .config("spark.hadoop.fs.s3a.aws.credentials.provider", "com.amazonaws.auth.EnvironmentVariableCredentialsProvider")
         .config("spark.sql.catalogImplementation", "hive")
         .config("spark.sql.defaultCatalog", "integration")
         .config("spark.sql.execution.arrow.pyspark.enabled", "true")

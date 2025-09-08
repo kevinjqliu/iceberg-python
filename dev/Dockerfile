@@ -21,7 +21,7 @@ RUN apt-get -qq update && \
       curl \
       vim \
       unzip \
-      openjdk-11-jdk \
+      openjdk-17-jdk \
       build-essential \
       software-properties-common \
       ssh && \
@@ -62,6 +62,7 @@ RUN chmod u+x /opt/spark/sbin/* && \
     chmod u+x /opt/spark/bin/*
 
 RUN pip3 install -q ipython
+RUN pip3 install py4j
 
 RUN pip3 install "pyiceberg[s3fs,hive,pyarrow]==${PYICEBERG_VERSION}"
 
