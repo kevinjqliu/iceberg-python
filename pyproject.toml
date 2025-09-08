@@ -356,7 +356,7 @@ filterwarnings = [
   "ignore:datetime.datetime.utcnow\\(\\) is deprecated and scheduled for removal in a future version.",
   # Latest PySpark version (v3.5.3) throws this error, remove in a future release of PySpark (possibly v4.0.0).
   "ignore:is_datetime64tz_dtype is deprecated and will be removed in a future version.",
-  "ignore::DeprecationWarning:jupyter_core.*"
+  "ignore:.*Jupyter is migrating.*:DeprecationWarning",
 ]
 
 [tool.black]
