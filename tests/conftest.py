@@ -2551,7 +2551,7 @@ def spark() -> "SparkSession":
 
     spark = (
         SparkSession.builder.appName("PyIceberg integration test")
-        .config("spark.jars.repositories", "https://repository.apache.org/content/repositories/orgapacheiceberg-1268/")
+        .config("spark.jars.repositories", "https://repository.apache.org/content/repositories/orgapacheiceberg-1269/")
         .config("spark.sql.session.timeZone", "UTC")
         .config("spark.sql.shuffle.partitions", "1")
         .config("spark.default.parallelism", "1")
