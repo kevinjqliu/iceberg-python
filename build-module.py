@@ -70,6 +70,8 @@ class CythonBuildHook(BuildHookInterface):
     def initialize(self, version: str, build_data: dict[str, Any]) -> None:
         try:
             self.build_cython_extensions()
+            # Tell Hatchling this is not a pure Python wheel
+            build_data['pure_python'] = False
         except Exception:
             if not allowed_to_fail:
                 raise
