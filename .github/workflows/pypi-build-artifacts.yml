@@ -46,8 +46,8 @@ jobs:
             3.11
             3.12
 
-      - name: Install UV
-        run: make install-uv
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
 
       - name: Set version with RC
         env:
