@@ -18,13 +18,13 @@ ARG BASE_IMAGE_SPARK_VERSION=4.0.1
 FROM apache/spark:${BASE_IMAGE_SPARK_VERSION}
 
 # Dependency versions - keep these compatible
-ARG ICEBERG_VERSION=1.10.0
+ARG ICEBERG_VERSION=1.10.1
 ARG ICEBERG_SPARK_RUNTIME_VERSION=4.0_2.13
 ARG SPARK_VERSION=4.0.1
 ARG HADOOP_VERSION=3.4.1
 ARG SCALA_VERSION=2.13
 ARG AWS_SDK_VERSION=2.24.6
-ARG MAVEN_MIRROR=https://repo.maven.apache.org/maven2
+ARG MAVEN_MIRROR=https://repository.apache.org/content/repositories/orgapacheiceberg-1272
 
 USER root
 WORKDIR ${SPARK_HOME}
