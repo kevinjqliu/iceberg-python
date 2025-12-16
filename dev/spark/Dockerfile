@@ -25,7 +25,7 @@ ARG HADOOP_VERSION=3.4.1
 ARG SCALA_VERSION=2.13
 ARG AWS_SDK_VERSION=2.24.6
 ARG MAVEN_MIRROR=https://repo.maven.apache.org/maven2
-ARG ICEBERG_RC_MIRROR=https://repository.apache.org/content/repositories/orgapacheiceberg-1275
+ARG ICEBERG_RC_MIRROR=https://repository.apache.org/content/repositories/orgapacheiceberg-1276
 
 USER root
 WORKDIR ${SPARK_HOME}
