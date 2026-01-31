@@ -33,6 +33,20 @@ from pyiceberg.expressions import (
 )
 
 
+def _is_nan(value: Any) -> bool:
+    """Check if a value is NaN (only applicable to floats)."""
+    return isinstance(value, float) and isnan(value)
+
+
+def _null_safe_equals(column: str, value: Any) -> BooleanExpression:
+    """Create a null-safe equality expression (like SQL's <=> operator)."""
+    if value is None:
+        return IsNull(column)
+    if _is_nan(value):
+        return IsNaN(column)
+    return EqualTo(column, value)
+
+
 def create_match_filter(df: pyarrow_table, join_cols: list[str]) -> BooleanExpression:
     unique_keys = df.select(join_cols).group_by(join_cols).aggregate([])
     filters: list[BooleanExpression] = []
@@ -41,27 +55,19 @@ def create_match_filter(df: pyarrow_table, join_cols: list[str]) -> BooleanExpre
         column = join_cols[0]
         values = set(unique_keys[0].to_pylist())
 
+        # Handle NULL and NaN separately since IN expression doesn't support them
         if None in values:
             filters.append(IsNull(column))
-            values.remove(None)
+            values.discard(None)
 
-        if nans := {v for v in values if isinstance(v, float) and isnan(v)}:
+        if nans := {v for v in values if _is_nan(v)}:
             filters.append(IsNaN(column))
             values -= nans
 
-        filters.append(In(column, values))
+        if values:
+            filters.append(In(column, values))
     else:
-
-        def equals(column: str, value: Any) -> BooleanExpression:
-            if value is None:
-                return IsNull(column)
-
-            if isinstance(value, float) and isnan(value):
-                return IsNaN(column)
-
-            return EqualTo(column, value)
-
-        filters = [And(*[equals(col, row[col]) for col in join_cols]) for row in unique_keys.to_pylist()]
+        filters = [And(*[_null_safe_equals(col, row[col]) for col in join_cols]) for row in unique_keys.to_pylist()]
 
     if len(filters) == 0:
         return AlwaysFalse()
@@ -120,13 +126,12 @@ def get_rows_to_update(source_table: pa.Table, target_table: pa.Table, join_cols
     # Step 2: Prepare target index with join keys and a marker
     target_index = target_table.select(join_cols_set).append_column(TARGET_INDEX_COLUMN_NAME, pa.array(range(len(target_table))))
 
-    # Step 3: Perform an inner join to find which rows from source exist in target
-    # PyArrow joins ignore null values, and we want null==null to hold, so we compute the join in Python.
-    # This is equivalent to:
-    # matching_indices = source_index.join(target_index, keys=list(join_cols_set), join_type="inner")
-    source_indices = {tuple(row[col] for col in join_cols): row[SOURCE_INDEX_COLUMN_NAME] for row in source_index.to_pylist()}
-    target_indices = {tuple(row[col] for col in join_cols): row[TARGET_INDEX_COLUMN_NAME] for row in target_index.to_pylist()}
-    matching_indices = [(s, t) for key, s in source_indices.items() if (t := target_indices.get(key)) is not None]
+    # Step 3: Perform an inner join to find which rows from source exist in target.
+    # We use a Python-based join instead of PyArrow's join because PyArrow ignores NULL values
+    # (NULL == NULL returns UNKNOWN in SQL semantics). We want null-safe equality where NULL == NULL is TRUE.
+    source_keys = {tuple(row[col] for col in join_cols): row[SOURCE_INDEX_COLUMN_NAME] for row in source_index.to_pylist()}
+    target_keys = {tuple(row[col] for col in join_cols): row[TARGET_INDEX_COLUMN_NAME] for row in target_index.to_pylist()}
+    matching_indices = [(s, t) for key, s in source_keys.items() if (t := target_keys.get(key)) is not None]
 
     # Step 4: Compare all rows using Python
     to_update_indices = []

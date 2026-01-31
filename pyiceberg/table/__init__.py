@@ -766,7 +766,6 @@ class Transaction:
         """Shorthand API for performing an upsert to an iceberg table.
 
         Args:
-
             df: The input dataframe to upsert with the table's data.
             join_cols: Columns to join on, if not provided, it will use the identifier-field-ids.
             when_matched_update_all: Bool indicating to update rows that are matched but require an update
@@ -777,26 +776,37 @@ class Transaction:
             branch: Branch Reference to run the upsert operation
             snapshot_properties: Custom properties to be added to the snapshot summary
 
-            To learn more about the identifier-field-ids: https://iceberg.apache.org/spec/#identifier-field-ids
+        Note:
+            This method uses null-safe equality for matching rows on join columns, similar to
+            SQL's <=> operator or Spark's NULL-safe equal. This means:
+            - NULL values in join columns will match other NULL values
+            - A row with (key=NULL) in the source will update a row with (key=NULL) in the target
 
-                Example Use Cases:
-                    Case 1: Both Parameters = True (Full Upsert)
-                    Existing row found → Update it
-                    New row found → Insert it
+            This is equivalent to Spark SQL:
+                MERGE INTO target USING source ON target.key <=> source.key
 
-                    Case 2: when_matched_update_all = False, when_not_matched_insert_all = True
-                    Existing row found → Do nothing (no updates)
-                    New row found → Insert it
+            If you want standard SQL equality semantics where NULL never matches NULL,
+            filter out NULL values from the join columns before calling upsert.
 
-                    Case 3: when_matched_update_all = True, when_not_matched_insert_all = False
-                    Existing row found → Update it
-                    New row found → Do nothing (no inserts)
+        To learn more about the identifier-field-ids: https://iceberg.apache.org/spec/#identifier-field-ids
 
-                    Case 4: Both Parameters = False (No Merge Effect)
-                    Existing row found → Do nothing
-                    New row found → Do nothing
-                    (Function effectively does nothing)
+        Example Use Cases:
+            Case 1: Both Parameters = True (Full Upsert)
+                Existing row found → Update it
+                New row found → Insert it
 
+            Case 2: when_matched_update_all = False, when_not_matched_insert_all = True
+                Existing row found → Do nothing (no updates)
+                New row found → Insert it
+
+            Case 3: when_matched_update_all = True, when_not_matched_insert_all = False
+                Existing row found → Update it
+                New row found → Do nothing (no inserts)
+
+            Case 4: Both Parameters = False (No Merge Effect)
+                Existing row found → Do nothing
+                New row found → Do nothing
+                (Function effectively does nothing)
 
         Returns:
             An UpsertResult class (contains details of rows updated and inserted)
@@ -1368,7 +1378,6 @@ class Table:
         """Shorthand API for performing an upsert to an iceberg table.
 
         Args:
-
             df: The input dataframe to upsert with the table's data.
             join_cols: Columns to join on, if not provided, it will use the identifier-field-ids.
             when_matched_update_all: Bool indicating to update rows that are matched but require an update
@@ -1379,26 +1388,37 @@ class Table:
             branch: Branch Reference to run the upsert operation
             snapshot_properties: Custom properties to be added to the snapshot summary
 
-            To learn more about the identifier-field-ids: https://iceberg.apache.org/spec/#identifier-field-ids
+        Note:
+            This method uses null-safe equality for matching rows on join columns, similar to
+            SQL's <=> operator or Spark's NULL-safe equal. This means:
+            - NULL values in join columns will match other NULL values
+            - A row with (key=NULL) in the source will update a row with (key=NULL) in the target
 
-                Example Use Cases:
-                    Case 1: Both Parameters = True (Full Upsert)
-                    Existing row found → Update it
-                    New row found → Insert it
+            This is equivalent to Spark SQL:
+                MERGE INTO target USING source ON target.key <=> source.key
 
-                    Case 2: when_matched_update_all = False, when_not_matched_insert_all = True
-                    Existing row found → Do nothing (no updates)
-                    New row found → Insert it
+            If you want standard SQL equality semantics where NULL never matches NULL,
+            filter out NULL values from the join columns before calling upsert.
 
-                    Case 3: when_matched_update_all = True, when_not_matched_insert_all = False
-                    Existing row found → Update it
-                    New row found → Do nothing (no inserts)
+        To learn more about the identifier-field-ids: https://iceberg.apache.org/spec/#identifier-field-ids
 
-                    Case 4: Both Parameters = False (No Merge Effect)
-                    Existing row found → Do nothing
-                    New row found → Do nothing
-                    (Function effectively does nothing)
+        Example Use Cases:
+            Case 1: Both Parameters = True (Full Upsert)
+                Existing row found → Update it
+                New row found → Insert it
 
+            Case 2: when_matched_update_all = False, when_not_matched_insert_all = True
+                Existing row found → Do nothing (no updates)
+                New row found → Insert it
+
+            Case 3: when_matched_update_all = True, when_not_matched_insert_all = False
+                Existing row found → Update it
+                New row found → Do nothing (no inserts)
+
+            Case 4: Both Parameters = False (No Merge Effect)
+                Existing row found → Do nothing
+                New row found → Do nothing
+                (Function effectively does nothing)
 
         Returns:
             An UpsertResult class (contains details of rows updated and inserted)
