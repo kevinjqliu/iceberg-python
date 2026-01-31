@@ -127,11 +127,25 @@ def get_rows_to_update(source_table: pa.Table, target_table: pa.Table, join_cols
     target_index = target_table.select(join_cols_set).append_column(TARGET_INDEX_COLUMN_NAME, pa.array(range(len(target_table))))
 
     # Step 3: Perform an inner join to find which rows from source exist in target.
-    # We use a Python-based join instead of PyArrow's join because PyArrow ignores NULL values
-    # (NULL == NULL returns UNKNOWN in SQL semantics). We want null-safe equality where NULL == NULL is TRUE.
-    source_keys = {tuple(row[col] for col in join_cols): row[SOURCE_INDEX_COLUMN_NAME] for row in source_index.to_pylist()}
-    target_keys = {tuple(row[col] for col in join_cols): row[TARGET_INDEX_COLUMN_NAME] for row in target_index.to_pylist()}
-    matching_indices = [(s, t) for key, s in source_keys.items() if (t := target_keys.get(key)) is not None]
+    # PyArrow's join ignores NULL values (NULL == NULL returns UNKNOWN in SQL semantics).
+    # We want null-safe equality where NULL == NULL is TRUE, so we fall back to Python when NULLs are present.
+    has_nulls = any(source_index.column(col).null_count > 0 or target_index.column(col).null_count > 0 for col in join_cols)
+
+    if has_nulls:
+        # Python-based null-safe join
+        source_keys = {tuple(row[col] for col in join_cols): row[SOURCE_INDEX_COLUMN_NAME] for row in source_index.to_pylist()}
+        target_keys = {tuple(row[col] for col in join_cols): row[TARGET_INDEX_COLUMN_NAME] for row in target_index.to_pylist()}
+        matching_indices = [(s, t) for key, s in source_keys.items() if (t := target_keys.get(key)) is not None]
+    else:
+        # Fast PyArrow join (no nulls to worry about)
+        joined = source_index.join(target_index, keys=join_cols, join_type="inner")
+        matching_indices = list(
+            zip(
+                joined[SOURCE_INDEX_COLUMN_NAME].to_pylist(),
+                joined[TARGET_INDEX_COLUMN_NAME].to_pylist(),
+                strict=True,
+            )
+        )
 
     # Step 4: Compare all rows using Python
     to_update_indices = []
