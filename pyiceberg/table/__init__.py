@@ -103,7 +103,6 @@ if TYPE_CHECKING:
     import pyarrow as pa
     import ray
     from duckdb import DuckDBPyConnection
-    from pyiceberg_core.datafusion import IcebergDataFusionTable
 
     from pyiceberg.catalog import Catalog
     from pyiceberg.catalog.rest.scan_planning import RESTContentFile, RESTDeleteFile, RESTFileScanTask
@@ -1559,7 +1558,7 @@ class Table:
 
         return pl.scan_iceberg(self)
 
-    def __datafusion_table_provider__(self) -> IcebergDataFusionTable:
+    def __datafusion_table_provider__(self, session: Any | None = None) -> Any:
         """Return the DataFusion table provider PyCapsule interface.
 
         To support DataFusion features such as push down filtering, this function will return a PyCapsule
@@ -1602,7 +1601,7 @@ class Table:
             identifier=self.name(),
             metadata_location=self.metadata_location,
             file_io_properties=self.io.properties,
-        ).__datafusion_table_provider__()
+        ).__datafusion_table_provider__(session)
 
 
 class StaticTable(Table):
