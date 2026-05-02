@@ -111,7 +111,7 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
             item.add_marker("unmarked")
 
 
-def pytest_configure(config) -> None:
+def pytest_configure(config: pytest.Config) -> None:
     os.environ["RAY_ENABLE_UV_RUN_RUNTIME_ENV"] = "0"
 
 
