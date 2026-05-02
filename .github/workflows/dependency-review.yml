@@ -71,7 +71,6 @@ jobs:
             Zlib,
             CC0-1.0,
             CC-PDDC,
-            ECL-2.0,
             AFL-3.0,
             MS-PL,
             UPL-1.0,
@@ -81,5 +80,4 @@ jobs:
             HPND,
             MulanPSL-2.0,
             BlueOak-1.0.0,
-            Artistic-2.0,
-            Zope-2.0
+            ZPL-2.0
