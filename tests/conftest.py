@@ -3034,13 +3034,14 @@ def ray_session() -> Generator[Any, None, None]:
     """Fixture to manage Ray initialization and shutdown for tests."""
     import os
 
-    import ray
-
-    # Disable Ray's automatic uv environment propagation to workers.
-    # When tests are invoked via `uv run`, Ray detects the wrapper and tries
-    # to package the working directory for remote workers, which is unnecessary
-    # and problematic in local single-node test mode.
+    # Must be set BEFORE importing ray. Ray checks this env var at import time
+    # (in ray._private.runtime_env) to decide whether to propagate the uv
+    # runtime environment to workers. When tests run under `uv run`, Ray
+    # detects the wrapper and tries to package the working directory, causing
+    # the test session to hang.
     os.environ["RAY_ENABLE_UV_RUN_RUNTIME_ENV"] = "0"
+
+    import ray
 
     ray.init(
         ignore_reinit_error=True,
