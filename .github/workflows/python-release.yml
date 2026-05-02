@@ -147,7 +147,7 @@ jobs:
     with:
       version: ${{ needs.validate-inputs.outputs.VERSION }}rc${{ needs.validate-inputs.outputs.RC }}
 
-  # PyPi
+  # PyPI
   pypi-build-artifacts:
     needs:
       - validate-inputs

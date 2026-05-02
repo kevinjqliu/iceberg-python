@@ -31,7 +31,7 @@ permissions:
 
 jobs:
   pypi-build-artifacts:
-    name: Build artifacts for PyPi on ${{ matrix.os }}
+    name: Build artifacts for PyPI on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       max-parallel: 15

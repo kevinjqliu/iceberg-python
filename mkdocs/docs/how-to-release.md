@@ -134,7 +134,7 @@ This action will generate artifacts that will include both source distribution (
 This action will generate two final artifacts:
 
 * `svn-release-candidate-${VERSION}rc${RC}` for SVN
-* `pypi-release-candidate-${VERSION}rc${RC}` for PyPi
+* `pypi-release-candidate-${VERSION}rc${RC}` for PyPI
 
 If `gh` is available, watch the GitHub Action progress using:
 
@@ -208,7 +208,7 @@ Clean up old RC artifacts:
 svn delete https://dist.apache.org/repos/dist/dev/iceberg/pyiceberg-<OLD_RC_VERSION> -m "Remove old RC artifacts"
 ```
 
-#### Upload to PyPi
+#### Upload to PyPI
 
 The [`Python Build Release Candidate` workflow](https://github.com/apache/iceberg-python/actions/workflows/python-release.yml) includes a `publish-rc-to-pypi` job that automatically publishes the RC artifacts to PyPI with [PEP 740 build attestations](https://peps.python.org/pep-0740/) after the build completes. This job is gated by the `pypi` environment, which requires reviewer approval before publishing.
 
@@ -216,7 +216,7 @@ Once the build artifacts are ready, approve the deployment in the `pypi` environ
 
 This **won't** bump the version for everyone that hasn't pinned their version, since it is set to an RC [pre-release and those are ignored](https://packaging.python.org/en/latest/guides/distributing-packages-using-setuptools/#pre-release-versioning).
 
-Verify the artifact is uploaded to [PyPi](https://pypi.org/project/pyiceberg/#history).
+Verify the artifact is uploaded to [PyPI](https://pypi.org/project/pyiceberg/#history).
 
 ## Vote
 
@@ -330,7 +330,7 @@ We only want to host the latest release. Clean up old release artifacts:
 svn delete https://dist.apache.org/repos/dist/release/iceberg/pyiceberg-<OLD_RELEASE_VERSION> -m "Remove old release artifacts"
 ```
 
-### Upload the accepted release to PyPi
+### Upload the accepted release to PyPI
 
 Run the [`Publish Release to PyPI` workflow](https://github.com/apache/iceberg-python/actions/workflows/python-publish-pypi.yml) to publish the final release:
 
@@ -338,9 +338,9 @@ Run the [`Publish Release to PyPI` workflow](https://github.com/apache/iceberg-p
 2. Enter the `version` (e.g., `0.8.0`)
 3. Approve the deployment in the `pypi` environment
 
-The workflow downloads the clean-versioned artifacts (e.g., `pyiceberg-0.8.0-*.whl`) from the [Apache SVN release dist](https://dist.apache.org/repos/dist/release/iceberg/) and publishes them to PyPI with [PEP 740 build attestations](https://peps.python.org/pep-0740/).
+The workflow downloads the clean-versioned artifacts (e.g., `pyiceberg-0.8.0-*.whl` and `pyiceberg-0.8.0.tar.gz`) from the [Apache SVN release dist](https://dist.apache.org/repos/dist/release/iceberg/) and publishes them to PyPI with [PEP 740 build attestations](https://peps.python.org/pep-0740/).
 
-Verify the artifact is available on [PyPi](https://pypi.org/project/pyiceberg/#history).
+Verify the artifact is available on [PyPI](https://pypi.org/project/pyiceberg/#history).
 
 ## Post Release
 
