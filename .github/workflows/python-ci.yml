@@ -45,6 +45,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+env:
+  UV_LOCKED: 1  # All uv commands enforce --locked in CI (no re-resolution)
+
 jobs:
   lint-and-unit-test:
     runs-on: ubuntu-latest
@@ -67,8 +70,6 @@ jobs:
         enable-cache: true
     - name: Install system dependencies
       run: sudo apt-get update && sudo apt-get install -y libkrb5-dev # for kerberos
-    - name: Check uv.lock is up to date
-      run: uv lock --check
     - name: Install
       run: make install
     - name: Run linters

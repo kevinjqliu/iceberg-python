@@ -35,8 +35,10 @@ This guide outlines the process for releasing PyIceberg in accordance with the [
     * Permission to upload artifacts to the [Apache development distribution](https://dist.apache.org/repos/dist/dev/iceberg/) (requires Apache Committer access).
     * Permission to upload artifacts to the [Apache release distribution](https://dist.apache.org/repos/dist/release/iceberg/) (requires Apache PMC access).
 * PyPI Access
-    * The `twine` package must be installed for uploading releases to PyPi.
-    * A PyPI account with publishing permissions for the [pyiceberg project](https://pypi.org/project/pyiceberg/).
+    * A `pypi` [environment](https://docs.github.com/en/actions/deployment/targeting-different-environments/using-environments-for-deployment) must be configured in the GitHub repo with required reviewers.
+    * PyPI [Trusted Publishing](https://docs.pypi.org/trusted-publishers/) must be configured with **two** publisher entries:
+        * `python-release.yml` with environment `pypi` (for RC pre-releases)
+        * `python-publish-pypi.yml` with environment `pypi` (for final releases)
 
 ## Preparing for a Release
 
@@ -208,27 +210,11 @@ svn delete https://dist.apache.org/repos/dist/dev/iceberg/pyiceberg-<OLD_RC_VERS
 
 #### Upload to PyPi
 
-##### Download Artifacts
+The [`Python Build Release Candidate` workflow](https://github.com/apache/iceberg-python/actions/workflows/python-release.yml) includes a `publish-rc-to-pypi` job that automatically publishes the RC artifacts to PyPI with [PEP 740 build attestations](https://peps.python.org/pep-0740/) after the build completes. This job is gated by the `pypi` environment, which requires reviewer approval before publishing.
 
-Download the PyPi artifact from the GitHub Action and unzip it.
+Once the build artifacts are ready, approve the deployment in the `pypi` environment to publish the RC.
 
-##### Upload Artifacts to PyPi
-
-Update the artifact directory to PyPi using `twine`. This **won't** bump the version for everyone that hasn't pinned their version, since it is set to an RC [pre-release and those are ignored](https://packaging.python.org/en/latest/guides/distributing-packages-using-setuptools/#pre-release-versioning).
-
-<!-- prettier-ignore-start -->
-
-!!! note
-    `twine` might require an PyPi API token.
-
-<!-- prettier-ignore-end -->
-
-```bash
-: "${VERSION:?ERROR: VERSION is not set or is empty}"
-: "${RC:?ERROR: RC is not set or is empty}"
-
-twine upload pypi-release-candidate-${VERSION}rc${RC}/*
-```
+This **won't** bump the version for everyone that hasn't pinned their version, since it is set to an RC [pre-release and those are ignored](https://packaging.python.org/en/latest/guides/distributing-packages-using-setuptools/#pre-release-versioning).
 
 Verify the artifact is uploaded to [PyPi](https://pypi.org/project/pyiceberg/#history).
 
@@ -346,26 +332,15 @@ svn delete https://dist.apache.org/repos/dist/release/iceberg/pyiceberg-<OLD_REL
 
 ### Upload the accepted release to PyPi
 
-The latest version can be pushed to PyPi. Check out the Apache SVN and make sure to publish the right version with `twine`:
+Run the [`Publish Release to PyPI` workflow](https://github.com/apache/iceberg-python/actions/workflows/python-publish-pypi.yml) to publish the final release:
 
-<!-- prettier-ignore-start -->
+1. Go to **Actions** → **Publish Release to PyPI** → **Run workflow**
+2. Enter the `version` (e.g., `0.8.0`)
+3. Approve the deployment in the `pypi` environment
 
-!!! note
-    `twine` might require an PyPi API token.
+The workflow downloads the clean-versioned artifacts (e.g., `pyiceberg-0.8.0-*.whl`) from the [Apache SVN release dist](https://dist.apache.org/repos/dist/release/iceberg/) and publishes them to PyPI with [PEP 740 build attestations](https://peps.python.org/pep-0740/).
 
-<!-- prettier-ignore-end -->
-
-```bash
-: "${VERSION:?ERROR: VERSION is not set or is empty}"
-
-svn checkout https://dist.apache.org/repos/dist/release/iceberg/pyiceberg-${VERSION} /tmp/iceberg-dist-release/pyiceberg-${VERSION}
-
-cd /tmp/iceberg-dist-release/pyiceberg-${VERSION}
-
-twine upload pyiceberg-*.whl pyiceberg-*.tar.gz
-```
-
-Verify the artifact is uploaded to [PyPi](https://pypi.org/project/pyiceberg/#history).
+Verify the artifact is available on [PyPi](https://pypi.org/project/pyiceberg/#history).
 
 ## Post Release
 

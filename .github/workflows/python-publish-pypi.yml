@@ -1,0 +1,76 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+# Publishes the final release to PyPI with PEP 740 build attestations via
+# Trusted Publishing. Run after the vote passes and SVN release is promoted.
+#
+# The RC pre-release is published automatically by python-release.yml.
+#
+# Prerequisites (one-time setup):
+#   1. Create a "pypi" environment in GitHub repo settings with required reviewers.
+#   2. Configure Trusted Publishing on PyPI:
+#      https://pypi.org/manage/project/pyiceberg/settings/publishing/
+#      - Owner: apache
+#      - Repository: iceberg-python
+#      - Workflow: python-publish-pypi.yml
+#      - Environment: pypi
+
+name: "Publish Release to PyPI"
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., 0.8.0)'
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  publish-pypi:
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/pyiceberg/${{ inputs.version }}
+    permissions:
+      id-token: write   # OIDC token for Trusted Publishing + Sigstore signing
+      attestations: write  # PEP 740 build attestations stored on PyPI
+    steps:
+      - name: Download release artifacts from Apache SVN
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          SVN_URL="https://dist.apache.org/repos/dist/release/iceberg/pyiceberg-${VERSION}"
+
+          echo "Downloading from $SVN_URL..."
+          svn export --non-interactive "$SVN_URL" svn-artifacts/
+
+          mkdir -p dist/
+          cp svn-artifacts/pyiceberg-*.whl svn-artifacts/pyiceberg-*.tar.gz dist/
+
+          echo "Artifacts to publish:"
+          ls -lah dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e # v1.13.0
+        with:
+          attestations: true
+          verbose: true
