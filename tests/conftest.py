@@ -111,6 +111,11 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
             item.add_marker("unmarked")
 
 
+def pytest_configure(config):
+    import os
+    os.environ["RAY_ENABLE_UV_RUN_RUNTIME_ENV"] = "0"
+
+
 @pytest.fixture(autouse=True, scope="session")
 def _isolate_pyiceberg_config() -> None:
     """Make test runs ignore your local PyIceberg config.
@@ -3032,13 +3037,6 @@ def pyarrow_table_with_promoted_types(pyarrow_schema_with_promoted_types: "pa.Sc
 @pytest.fixture(scope="session")
 def ray_session() -> Generator[Any, None, None]:
     """Fixture to manage Ray initialization and shutdown for tests."""
-    # Must be set BEFORE importing ray. Ray checks this env var at import time
-    # (in ray._private.runtime_env) to decide whether to propagate the uv
-    # runtime environment to workers. When tests run under `uv run`, Ray
-    # detects the wrapper and tries to package the working directory, causing
-    # the test session to hang.
-    os.environ["RAY_ENABLE_UV_RUN_RUNTIME_ENV"] = "0"
-
     import ray
 
     ray.init(
