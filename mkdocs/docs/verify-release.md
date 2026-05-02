@@ -59,7 +59,7 @@ export PYICEBERG_VERIFICATION_DIR=/tmp/pyiceberg/${PYICEBERG_VERSION}
 Next, verify the `.asc` file.
 
 ```sh
-svn checkout https://dist.apache.org/repos/dist/dev/iceberg/pyiceberg-$PYICEBERG_VERSION/ ${PYICEBERG_VERIFICATION_DIR}
+svn export https://dist.apache.org/repos/dist/dev/iceberg/pyiceberg-$PYICEBERG_VERSION/ ${PYICEBERG_VERIFICATION_DIR}
 
 cd ${PYICEBERG_VERIFICATION_DIR}
 

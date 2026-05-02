@@ -195,7 +195,9 @@ Now, upload the files from the same directory:
 : "${VERSION_WITH_RC:?ERROR: VERSION_WITH_RC is not set or is empty}"
 : "${RC:?ERROR: RC is not set or is empty}"
 
-svn import "svn-release-candidate-${VERSION}rc${RC}" "https://dist.apache.org/repos/dist/dev/iceberg/pyiceberg-${VERSION_WITH_RC}" -m "PyIceberg ${VERSION_WITH_RC}"
+svn import "svn-release-candidate-${VERSION}rc${RC}" \
+  "https://dist.apache.org/repos/dist/dev/iceberg/pyiceberg-${VERSION_WITH_RC}" \
+  -m "PyIceberg ${VERSION_WITH_RC}"
 ```
 
 Verify the artifact is uploaded to [https://dist.apache.org/repos/dist/dev/iceberg](https://dist.apache.org/repos/dist/dev/iceberg/).
@@ -205,7 +207,11 @@ Verify the artifact is uploaded to [https://dist.apache.org/repos/dist/dev/icebe
 Clean up old RC artifacts:
 
 ```bash
-svn delete https://dist.apache.org/repos/dist/dev/iceberg/pyiceberg-<OLD_RC_VERSION> -m "Remove old RC artifacts"
+export OLD_RC_VERSION="<OLD_RC_VERSION>"  # e.g., 0.8.0rc1
+: "${OLD_RC_VERSION:?ERROR: OLD_RC_VERSION is not set or is empty}"
+
+svn delete "https://dist.apache.org/repos/dist/dev/iceberg/pyiceberg-${OLD_RC_VERSION}" \
+  -m "Remove old RC artifacts"
 ```
 
 #### Upload to PyPI
@@ -317,7 +323,8 @@ Kind regards,
 export SVN_DEV_DIR_VERSIONED="https://dist.apache.org/repos/dist/dev/iceberg/pyiceberg-${VERSION_WITH_RC}"
 export SVN_RELEASE_DIR_VERSIONED="https://dist.apache.org/repos/dist/release/iceberg/pyiceberg-${VERSION}"
 
-svn mv ${SVN_DEV_DIR_VERSIONED} ${SVN_RELEASE_DIR_VERSIONED} -m "PyIceberg: Add release ${VERSION}"
+svn mv "${SVN_DEV_DIR_VERSIONED}" "${SVN_RELEASE_DIR_VERSIONED}" \
+  -m "PyIceberg: Add release ${VERSION}"
 ```
 
 Verify the artifact is uploaded to [https://dist.apache.org/repos/dist/release/iceberg](https://dist.apache.org/repos/dist/release/iceberg/).
@@ -327,7 +334,11 @@ Verify the artifact is uploaded to [https://dist.apache.org/repos/dist/release/i
 We only want to host the latest release. Clean up old release artifacts:
 
 ```bash
-svn delete https://dist.apache.org/repos/dist/release/iceberg/pyiceberg-<OLD_RELEASE_VERSION> -m "Remove old release artifacts"
+export OLD_RELEASE_VERSION="<OLD_RELEASE_VERSION>"  # e.g., 0.7.0
+: "${OLD_RELEASE_VERSION:?ERROR: OLD_RELEASE_VERSION is not set or is empty}"
+
+svn delete "https://dist.apache.org/repos/dist/release/iceberg/pyiceberg-${OLD_RELEASE_VERSION}" \
+  -m "Remove old release artifacts"
 ```
 
 ### Upload the accepted release to PyPI
@@ -399,12 +410,13 @@ To install gpg on a M1 based Mac, a couple of additional steps are required: <ht
 Then, published GPG key to the [Apache Iceberg KEYS file](https://downloads.apache.org/iceberg/KEYS):
 
 ```bash
-svn co https://dist.apache.org/repos/dist/release/iceberg icebergsvn
+svn co --depth empty https://dist.apache.org/repos/dist/release/iceberg icebergsvn
 cd icebergsvn
+svn up KEYS
 echo "" >> KEYS # append a newline
 gpg --list-sigs <YOUR KEY ID HERE> >> KEYS # append signatures
 gpg --armor --export <YOUR KEY ID HERE> >> KEYS # append public key block
-svn commit -m "add key for <YOUR NAME HERE>" # this requires Iceberg PMC privileges
+svn commit -m "add key for <YOUR NAME HERE>"  # this requires Iceberg PMC privileges
 ```
 
 <!-- prettier-ignore-start -->
