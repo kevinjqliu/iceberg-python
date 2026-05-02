@@ -3032,8 +3032,6 @@ def pyarrow_table_with_promoted_types(pyarrow_schema_with_promoted_types: "pa.Sc
 @pytest.fixture(scope="session")
 def ray_session() -> Generator[Any, None, None]:
     """Fixture to manage Ray initialization and shutdown for tests."""
-    import os
-
     # Must be set BEFORE importing ray. Ray checks this env var at import time
     # (in ray._private.runtime_env) to decide whether to propagate the uv
     # runtime environment to workers. When tests run under `uv run`, Ray
