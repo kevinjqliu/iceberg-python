@@ -18,7 +18,10 @@
 services:
   spark-iceberg:
     image: pyiceberg-spark:latest
-    build: spark/
+    build:
+      context: spark/
+      args:
+        ICEBERG_MAVEN_MIRROR: https://repository.apache.org/content/repositories/orgapacheiceberg-1278
     container_name: pyiceberg-spark
     networks:
       iceberg_net:
