@@ -21,7 +21,7 @@ services:
     build:
       context: spark/
       args:
-        ICEBERG_MAVEN_MIRROR: https://repository.apache.org/content/repositories/orgapacheiceberg-1278
+        ICEBERG_MAVEN_MIRROR: https://repository.apache.org/content/repositories/orgapacheiceberg-1282
     container_name: pyiceberg-spark
     networks:
       iceberg_net:
