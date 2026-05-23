@@ -32,12 +32,17 @@ permissions:
 
 jobs:
   analyze:
-    name: Analyze Actions
+    name: Analyze (${{ matrix.language }})
     runs-on: ubuntu-slim
     permissions:
       contents: read
       security-events: write
       packages: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'actions', 'python' ]
 
     steps:
     - name: Checkout repository
@@ -48,9 +53,9 @@ jobs:
     - name: Initialize CodeQL
       uses: github/codeql-action/init@e46ed2cbd01164d986452f91f178727624ae40d7 # v4.35.3
       with:
-        languages: actions
+        languages: ${{ matrix.language }}
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@e46ed2cbd01164d986452f91f178727624ae40d7 # v4.35.3
       with:
-        category: "/language:actions"
+        category: "/language:${{ matrix.language }}"

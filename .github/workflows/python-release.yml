@@ -17,6 +17,15 @@
 # under the License.
 #
 
+# Prerequisites (one-time setup):
+#   1. Create a "pypi" environment in GitHub repo settings with required reviewers.
+#   2. Configure Trusted Publishing on PyPI for RC publishes:
+#      https://pypi.org/manage/project/pyiceberg/settings/publishing/
+#      - Owner: apache
+#      - Repository: iceberg-python
+#      - Workflow: python-release.yml
+#      - Environment: pypi
+
 name: "Python Build Release Candidate"
 
 on:
@@ -138,7 +147,7 @@ jobs:
     with:
       version: ${{ needs.validate-inputs.outputs.VERSION }}rc${{ needs.validate-inputs.outputs.RC }}
 
-  # PyPi
+  # PyPI
   pypi-build-artifacts:
     needs:
       - validate-inputs
@@ -146,3 +155,28 @@ jobs:
     uses: ./.github/workflows/pypi-build-artifacts.yml
     with:
       version: ${{ needs.validate-inputs.outputs.VERSION }}rc${{ needs.validate-inputs.outputs.RC }}
+
+  # Publish RC pre-release to PyPI with PEP 740 attestations.
+  # Gated by the "pypi" environment (requires reviewer approval).
+  publish-rc-to-pypi:
+    needs:
+      - validate-inputs
+      - pypi-build-artifacts
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/pyiceberg/${{ needs.validate-inputs.outputs.VERSION }}rc${{ needs.validate-inputs.outputs.RC }}
+    permissions:
+      id-token: write   # OIDC token for Trusted Publishing + Sigstore signing
+      attestations: write  # PEP 740 build attestations stored on PyPI
+    steps:
+      - name: Download merged PyPI artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: "pypi-release-candidate-${{ needs.validate-inputs.outputs.VERSION }}rc${{ needs.validate-inputs.outputs.RC }}"
+          path: dist/
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e # v1.13.0
+        with:
+          attestations: true
+          verbose: true
