@@ -18,7 +18,9 @@
 services:
   spark-iceberg:
     image: pyiceberg-spark:latest
-    build: spark/
+    build:
+      context: https://github.com/kevinjqliu/iceberg-python.git#kevinjqliu/build-docker-from-github
+      dockerfile: dev/spark/Dockerfile
     container_name: pyiceberg-spark
     networks:
       iceberg_net:

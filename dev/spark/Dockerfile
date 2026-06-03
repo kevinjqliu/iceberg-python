@@ -54,7 +54,7 @@ RUN set -e && \
     done
 
 # Copy configuration last (changes more frequently than JARs)
-COPY --chown=spark:spark spark-defaults.conf ${SPARK_HOME}/conf/
+COPY --chown=spark:spark dev/spark/spark-defaults.conf ${SPARK_HOME}/conf/
 
 USER spark
 WORKDIR ${SPARK_HOME}
