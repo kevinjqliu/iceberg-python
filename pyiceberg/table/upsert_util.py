@@ -14,8 +14,8 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-import functools
-import operator
+from math import isnan
+from typing import Any
 
 import pyarrow as pa
 from pyarrow import Table as pyarrow_table
@@ -23,29 +23,58 @@ from pyarrow import compute as pc
 
 from pyiceberg.expressions import (
     AlwaysFalse,
+    And,
     BooleanExpression,
     EqualTo,
     In,
+    IsNaN,
+    IsNull,
     Or,
 )
 
 
+def _is_nan(value: Any) -> bool:
+    """Check if a value is NaN (only applicable to floats)."""
+    return isinstance(value, float) and isnan(value)
+
+
+def _null_safe_equals(column: str, value: Any) -> BooleanExpression:
+    """Create a null-safe equality expression (like SQL's <=> operator)."""
+    if value is None:
+        return IsNull(column)
+    if _is_nan(value):
+        return IsNaN(column)
+    return EqualTo(column, value)
+
+
 def create_match_filter(df: pyarrow_table, join_cols: list[str]) -> BooleanExpression:
     unique_keys = df.select(join_cols).group_by(join_cols).aggregate([])
+    filters: list[BooleanExpression] = []
 
     if len(join_cols) == 1:
-        return In(join_cols[0], unique_keys[0].to_pylist())
-    else:
-        filters = [
-            functools.reduce(operator.and_, [EqualTo(col, row[col]) for col in join_cols]) for row in unique_keys.to_pylist()
-        ]
+        column = join_cols[0]
+        values = set(unique_keys[0].to_pylist())
 
-        if len(filters) == 0:
-            return AlwaysFalse()
-        elif len(filters) == 1:
-            return filters[0]
-        else:
-            return Or(*filters)
+        # Handle NULL and NaN separately since IN expression doesn't support them
+        if None in values:
+            filters.append(IsNull(column))
+            values.discard(None)
+
+        if nans := {v for v in values if _is_nan(v)}:
+            filters.append(IsNaN(column))
+            values -= nans
+
+        if values:
+            filters.append(In(column, values))
+    else:
+        filters = [And(*[_null_safe_equals(col, row[col]) for col in join_cols]) for row in unique_keys.to_pylist()]
+
+    if len(filters) == 0:
+        return AlwaysFalse()
+    elif len(filters) == 1:
+        return filters[0]
+    else:
+        return Or(*filters)
 
 
 def has_duplicate_rows(df: pyarrow_table, join_cols: list[str]) -> bool:
@@ -97,16 +126,30 @@ def get_rows_to_update(source_table: pa.Table, target_table: pa.Table, join_cols
     # Step 2: Prepare target index with join keys and a marker
     target_index = target_table.select(join_cols_set).append_column(TARGET_INDEX_COLUMN_NAME, pa.array(range(len(target_table))))
 
-    # Step 3: Perform an inner join to find which rows from source exist in target
-    matching_indices = source_index.join(target_index, keys=list(join_cols_set), join_type="inner")
+    # Step 3: Perform an inner join to find which rows from source exist in target.
+    # PyArrow's join ignores NULL values (NULL == NULL returns UNKNOWN in SQL semantics).
+    # We want null-safe equality where NULL == NULL is TRUE, so we fall back to Python when NULLs are present.
+    has_nulls = any(source_index.column(col).null_count > 0 or target_index.column(col).null_count > 0 for col in join_cols)
+
+    if has_nulls:
+        # Python-based null-safe join
+        source_keys = {tuple(row[col] for col in join_cols): row[SOURCE_INDEX_COLUMN_NAME] for row in source_index.to_pylist()}
+        target_keys = {tuple(row[col] for col in join_cols): row[TARGET_INDEX_COLUMN_NAME] for row in target_index.to_pylist()}
+        matching_indices = [(s, t) for key, s in source_keys.items() if (t := target_keys.get(key)) is not None]
+    else:
+        # Fast PyArrow join (no nulls to worry about)
+        joined = source_index.join(target_index, keys=join_cols, join_type="inner")
+        matching_indices = list(
+            zip(
+                joined[SOURCE_INDEX_COLUMN_NAME].to_pylist(),
+                joined[TARGET_INDEX_COLUMN_NAME].to_pylist(),
+                strict=True,
+            )
+        )
 
     # Step 4: Compare all rows using Python
     to_update_indices = []
-    for source_idx, target_idx in zip(
-        matching_indices[SOURCE_INDEX_COLUMN_NAME].to_pylist(),
-        matching_indices[TARGET_INDEX_COLUMN_NAME].to_pylist(),
-        strict=True,
-    ):
+    for source_idx, target_idx in matching_indices:
         source_row = source_table.slice(source_idx, 1)
         target_row = target_table.slice(target_idx, 1)
 
