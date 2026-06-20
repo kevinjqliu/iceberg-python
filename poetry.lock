@@ -2,23 +2,21 @@
 
 [[package]]
 name = "adlfs"
-version = "2024.12.0"
-description = "Access Azure Datalake Gen1 with fsspec and dask"
+version = "2026.5.0"
+description = "Access Azure Blobs and Data Lake Storage (ADLS) Gen2 with fsspec and dask"
 optional = true
-python-versions = ">=3.9"
+python-versions = ">=3.10"
 groups = ["main"]
-markers = "extra == \"adlfs\""
+markers = "python_version >= \"3.10\" and extra == \"adlfs\""
 files = [
-    {file = "adlfs-2024.12.0-py3-none-any.whl", hash = "sha256:00aab061ddec0413b2039487e656b62e01ece8ef1ca0493f76034a596cf069e3"},
-    {file = "adlfs-2024.12.0.tar.gz", hash = "sha256:04582bf7461a57365766d01a295a0a88b2b8c42c4fea06e2d673f62675cac5c6"},
+    {file = "adlfs-2026.5.0-py3-none-any.whl", hash = "sha256:7acf1d62eade0c1c0b1b0762b36cb0921a646dd41311af1d261f52fb24fe4e57"},
+    {file = "adlfs-2026.5.0.tar.gz", hash = "sha256:abb24e3afba57c6766799514b6f12b65b577d4946254961c15cef71e5b51f374"},
 ]
 
 [package.dependencies]
-aiohttp = ">=3.7.0"
 azure-core = ">=1.28.0,<2.0.0"
-azure-datalake-store = ">=0.0.53,<0.1"
 azure-identity = "*"
-azure-storage-blob = ">=12.17.0"
+azure-storage-blob = {version = ">=12.17.0", extras = ["aio"]}
 fsspec = ">=2023.12.0"
 
 [package.extras]
@@ -58,7 +56,7 @@ description = "Happy Eyeballs for asyncio"
 optional = true
 python-versions = ">=3.9"
 groups = ["main"]
-markers = "extra == \"adlfs\" or extra == \"gcsfs\" or extra == \"s3fs\""
+markers = "(extra == \"s3fs\" or extra == \"gcsfs\") and (extra == \"adlfs\" or extra == \"s3fs\" or extra == \"gcsfs\") or (extra == \"adlfs\" or extra == \"s3fs\" or extra == \"gcsfs\") and python_version >= \"3.10\""
 files = [
     {file = "aiohappyeyeballs-2.6.1-py3-none-any.whl", hash = "sha256:f349ba8f4b75cb25c99c5c2d84e997e485204d2902a9597802b0371f09331fb8"},
     {file = "aiohappyeyeballs-2.6.1.tar.gz", hash = "sha256:c3f9d0113123803ccadfdf3f0faa505bc78e6a72d1cc4806cbd719826e943558"},
@@ -71,7 +69,7 @@ description = "Async http client/server framework (asyncio)"
 optional = true
 python-versions = ">=3.9"
 groups = ["main"]
-markers = "extra == \"adlfs\" or extra == \"gcsfs\" or extra == \"s3fs\""
+markers = "(extra == \"s3fs\" or extra == \"gcsfs\") and (extra == \"adlfs\" or extra == \"s3fs\" or extra == \"gcsfs\") or (extra == \"adlfs\" or extra == \"s3fs\" or extra == \"gcsfs\") and python_version >= \"3.10\""
 files = [
     {file = "aiohttp-3.12.12-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:6f25e9d274d6abbb15254f76f100c3984d6b9ad6e66263cc60a465dd5c7e48f5"},
     {file = "aiohttp-3.12.12-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:b8ec3c1a1c13d24941b5b913607e57b9364e4c0ea69d5363181467492c4b2ba6"},
@@ -201,7 +199,7 @@ description = "aiosignal: a list of registered asynchronous callbacks"
 optional = true
 python-versions = ">=3.9"
 groups = ["main"]
-markers = "(extra == \"adlfs\" or extra == \"gcsfs\" or extra == \"s3fs\") and (extra == \"adlfs\" or extra == \"gcsfs\" or extra == \"s3fs\" or extra == \"ray\")"
+markers = "python_version == \"3.9\" and extra == \"ray\" or (extra == \"s3fs\" or extra == \"gcsfs\") and python_version < \"3.10\" or (extra == \"ray\" or extra == \"adlfs\" or extra == \"s3fs\" or extra == \"gcsfs\") and python_version >= \"3.10\""
 files = [
     {file = "aiosignal-1.3.2-py2.py3-none-any.whl", hash = "sha256:45cde58e409a301715980c2b01d0c28bdde3770d8290b5eb2173759d9acb31a5"},
     {file = "aiosignal-1.3.2.tar.gz", hash = "sha256:a8c255c66fafb1e499c9351d0bf32ff2d8a0321595ebac3b93713656d2436f54"},
@@ -267,7 +265,7 @@ description = "Timeout context manager for asyncio programs"
 optional = true
 python-versions = ">=3.8"
 groups = ["main"]
-markers = "(extra == \"adlfs\" or extra == \"gcsfs\" or extra == \"s3fs\") and python_version <= \"3.10\""
+markers = "(extra == \"s3fs\" or extra == \"gcsfs\") and python_version < \"3.10\" or python_version == \"3.10\" and (extra == \"adlfs\" or extra == \"s3fs\" or extra == \"gcsfs\")"
 files = [
     {file = "async_timeout-5.0.1-py3-none-any.whl", hash = "sha256:39e3809566ff85354557ec2398b55e096c8364bacac9405a7a1fa429e77fe76c"},
     {file = "async_timeout-5.0.1.tar.gz", hash = "sha256:d9321a7a3d5a6a5e187e824d2fa0793ce379a202935782d555d6e9d2735677d3"},
@@ -284,7 +282,7 @@ files = [
     {file = "attrs-25.3.0-py3-none-any.whl", hash = "sha256:427318ce031701fea540783410126f03899a97ffc6f61596ad581ac2e40e3bc3"},
     {file = "attrs-25.3.0.tar.gz", hash = "sha256:75d7cefc7fb576747b2c81b4442d4d4a1ce0900973527c011d1030fd3bf4af1b"},
 ]
-markers = {main = "(extra == \"adlfs\" or extra == \"gcsfs\" or extra == \"s3fs\") and (extra == \"adlfs\" or extra == \"gcsfs\" or extra == \"s3fs\" or extra == \"ray\")"}
+markers = {main = "python_version == \"3.9\" and extra == \"ray\" or (extra == \"s3fs\" or extra == \"gcsfs\") and python_version < \"3.10\" or (extra == \"ray\" or extra == \"adlfs\" or extra == \"s3fs\" or extra == \"gcsfs\") and python_version >= \"3.10\""}
 
 [package.extras]
 benchmark = ["cloudpickle ; platform_python_implementation == \"CPython\"", "hypothesis", "mypy (>=1.11.1) ; platform_python_implementation == \"CPython\" and python_version >= \"3.10\"", "pympler", "pytest (>=4.3.0)", "pytest-codspeed", "pytest-mypy-plugins ; platform_python_implementation == \"CPython\" and python_version >= \"3.10\"", "pytest-xdist[psutil]"]
@@ -338,13 +336,14 @@ description = "Microsoft Azure Core Library for Python"
 optional = true
 python-versions = ">=3.9"
 groups = ["main"]
-markers = "extra == \"adlfs\""
+markers = "python_version >= \"3.10\" and extra == \"adlfs\""
 files = [
     {file = "azure_core-1.34.0-py3-none-any.whl", hash = "sha256:0615d3b756beccdb6624d1c0ae97284f38b78fb59a2a9839bf927c66fbbdddd6"},
     {file = "azure_core-1.34.0.tar.gz", hash = "sha256:bdb544989f246a0ad1c85d72eeb45f2f835afdcbc5b45e43f0dbde7461c81ece"},
 ]
 
 [package.dependencies]
+aiohttp = {version = ">=3.0", optional = true, markers = "extra == \"aio\""}
 requests = ">=2.21.0"
 six = ">=1.11.0"
 typing-extensions = ">=4.6.0"
@@ -354,31 +353,13 @@ aio = ["aiohttp (>=3.0)"]
 tracing = ["opentelemetry-api (>=1.26,<2.0)"]
 
 [[package]]
-name = "azure-datalake-store"
-version = "0.0.53"
-description = "Azure Data Lake Store Filesystem Client Library for Python"
-optional = true
-python-versions = "*"
-groups = ["main"]
-markers = "extra == \"adlfs\""
-files = [
-    {file = "azure-datalake-store-0.0.53.tar.gz", hash = "sha256:05b6de62ee3f2a0a6e6941e6933b792b800c3e7f6ffce2fc324bc19875757393"},
-    {file = "azure_datalake_store-0.0.53-py2.py3-none-any.whl", hash = "sha256:a30c902a6e360aa47d7f69f086b426729784e71c536f330b691647a51dc42b2b"},
-]
-
-[package.dependencies]
-cffi = "*"
-msal = ">=1.16.0,<2"
-requests = ">=2.20.0"
-
-[[package]]
 name = "azure-identity"
 version = "1.23.0"
 description = "Microsoft Azure Identity Library for Python"
 optional = true
 python-versions = ">=3.9"
 groups = ["main"]
-markers = "extra == \"adlfs\""
+markers = "python_version >= \"3.10\" and extra == \"adlfs\""
 files = [
     {file = "azure_identity-1.23.0-py3-none-any.whl", hash = "sha256:dbbeb64b8e5eaa81c44c565f264b519ff2de7ff0e02271c49f3cb492762a50b0"},
     {file = "azure_identity-1.23.0.tar.gz", hash = "sha256:d9cdcad39adb49d4bb2953a217f62aec1f65bbb3c63c9076da2be2a47e53dde4"},
@@ -398,14 +379,17 @@ description = "Microsoft Azure Blob Storage Client Library for Python"
 optional = true
 python-versions = ">=3.8"
 groups = ["main"]
-markers = "extra == \"adlfs\""
+markers = "python_version >= \"3.10\" and extra == \"adlfs\""
 files = [
     {file = "azure_storage_blob-12.25.1-py3-none-any.whl", hash = "sha256:1f337aab12e918ec3f1b638baada97550673911c4ceed892acc8e4e891b74167"},
     {file = "azure_storage_blob-12.25.1.tar.gz", hash = "sha256:4f294ddc9bc47909ac66b8934bd26b50d2000278b10ad82cc109764fdc6e0e3b"},
 ]
 
 [package.dependencies]
-azure-core = ">=1.30.0"
+azure-core = [
+    {version = ">=1.30.0"},
+    {version = ">=1.30.0", extras = ["aio"], optional = true, markers = "extra == \"aio\""},
+]
 cryptography = ">=2.1.4"
 isodate = ">=0.6.1"
 typing-extensions = ">=4.6.0"
@@ -542,7 +526,7 @@ files = [
     {file = "boto3-1.37.3-py3-none-any.whl", hash = "sha256:2063b40af99fd02f6228ff52397b552ff3353831edaf8d25cc04801827ab9794"},
     {file = "boto3-1.37.3.tar.gz", hash = "sha256:21f3ce0ef111297e63a6eb998a25197b8c10982970c320d4c6e8db08be2157be"},
 ]
-markers = {main = "extra == \"dynamodb\" or extra == \"glue\" or extra == \"rest-sigv4\""}
+markers = {main = "extra == \"glue\" or extra == \"dynamodb\" or extra == \"rest-sigv4\""}
 
 [package.dependencies]
 botocore = ">=1.37.3,<1.38.0"
@@ -563,7 +547,7 @@ files = [
     {file = "botocore-1.37.3-py3-none-any.whl", hash = "sha256:d01bd3bf4c80e61fa88d636ad9f5c9f60a551d71549b481386c6b4efe0bb2b2e"},
     {file = "botocore-1.37.3.tar.gz", hash = "sha256:fe8403eb55a88faf9b0f9da6615e5bee7be056d75e17af66c3c8f0a3b0648da4"},
 ]
-markers = {main = "extra == \"dynamodb\" or extra == \"glue\" or extra == \"rest-sigv4\" or extra == \"s3fs\""}
+markers = {main = "extra == \"glue\" or extra == \"dynamodb\" or extra == \"rest-sigv4\" or extra == \"s3fs\""}
 
 [package.dependencies]
 jmespath = ">=0.7.1,<2.0.0"
@@ -703,7 +687,7 @@ files = [
     {file = "cffi-1.17.1-cp39-cp39-win_amd64.whl", hash = "sha256:d016c76bdd850f3c626af19b0542c9677ba156e4ee4fccfdd7848803533ef662"},
     {file = "cffi-1.17.1.tar.gz", hash = "sha256:1c39c6016c32bc48dd54561950ebd6836e1670f2ae46128f67cf49e789c52824"},
 ]
-markers = {main = "(extra == \"zstandard\" or extra == \"adlfs\") and platform_python_implementation == \"PyPy\" or extra == \"adlfs\"", dev = "platform_python_implementation != \"PyPy\""}
+markers = {main = "platform_python_implementation == \"PyPy\" and extra == \"zstandard\" or platform_python_implementation != \"PyPy\" and extra == \"adlfs\" and python_version >= \"3.10\" or extra == \"adlfs\" and extra == \"zstandard\" and python_version >= \"3.10\"", dev = "platform_python_implementation != \"PyPy\""}
 
 [package.dependencies]
 pycparser = "*"
@@ -1157,7 +1141,7 @@ files = [
     {file = "cryptography-45.0.4-pp311-pypy311_pp73-win_amd64.whl", hash = "sha256:bbc505d1dc469ac12a0a064214879eac6294038d6b24ae9f71faae1448a9608d"},
     {file = "cryptography-45.0.4.tar.gz", hash = "sha256:7405ade85c83c37682c8fe65554759800a4a8c54b2d96e0f8ad114d31b808d57"},
 ]
-markers = {main = "extra == \"adlfs\""}
+markers = {main = "python_version >= \"3.10\" and extra == \"adlfs\""}
 
 [package.dependencies]
 cffi = {version = ">=1.14", markers = "platform_python_implementation != \"PyPy\""}
@@ -1609,7 +1593,7 @@ description = "A list-like structure which implements collections.abc.MutableSeq
 optional = true
 python-versions = ">=3.9"
 groups = ["main"]
-markers = "(extra == \"adlfs\" or extra == \"gcsfs\" or extra == \"s3fs\") and (extra == \"adlfs\" or extra == \"gcsfs\" or extra == \"s3fs\" or extra == \"ray\")"
+markers = "python_version == \"3.9\" and extra == \"ray\" or (extra == \"s3fs\" or extra == \"gcsfs\") and python_version < \"3.10\" or (extra == \"ray\" or extra == \"adlfs\" or extra == \"s3fs\" or extra == \"gcsfs\") and python_version >= \"3.10\""
 files = [
     {file = "frozenlist-1.7.0-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:cc4df77d638aa2ed703b878dd093725b72a824c3c546c076e8fdf276f78ee84a"},
     {file = "frozenlist-1.7.0-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:716a9973a2cc963160394f701964fe25012600f3d311f60c790400b00e568b61"},
@@ -1808,7 +1792,7 @@ description = "Google API client core library"
 optional = true
 python-versions = ">=3.7"
 groups = ["main"]
-markers = "extra == \"gcsfs\" or extra == \"bigquery\""
+markers = "extra == \"bigquery\" or extra == \"gcsfs\""
 files = [
     {file = "google_api_core-2.25.0-py3-none-any.whl", hash = "sha256:1db79d1281dcf9f3d10023283299ba38f3dc9f639ec41085968fd23e5bcf512e"},
     {file = "google_api_core-2.25.0.tar.gz", hash = "sha256:9b548e688702f82a34ed8409fb8a6961166f0b7795032f0be8f48308dff4333a"},
@@ -1845,7 +1829,7 @@ description = "Google Authentication Library"
 optional = true
 python-versions = ">=3.7"
 groups = ["main"]
-markers = "extra == \"gcsfs\" or extra == \"bigquery\" or extra == \"gcp-auth\""
+markers = "extra == \"gcp-auth\" or extra == \"bigquery\" or extra == \"gcsfs\""
 files = [
     {file = "google_auth-2.40.3-py2.py3-none-any.whl", hash = "sha256:1370d4593e86213563547f97a92752fc658456fe4514c809544f330fed45a7ca"},
     {file = "google_auth-2.40.3.tar.gz", hash = "sha256:500c3a29adedeb36ea9cf24b8d10858e152f2412e3ca37829b3fa18e33d63b77"},
@@ -1927,7 +1911,7 @@ description = "Google Cloud API client core library"
 optional = true
 python-versions = ">=3.7"
 groups = ["main"]
-markers = "extra == \"gcsfs\" or extra == \"bigquery\""
+markers = "extra == \"bigquery\" or extra == \"gcsfs\""
 files = [
     {file = "google_cloud_core-2.4.3-py2.py3-none-any.whl", hash = "sha256:5130f9f4c14b4fafdff75c79448f9495cfade0d8775facf1b09c3bf67e027f6e"},
     {file = "google_cloud_core-2.4.3.tar.gz", hash = "sha256:1fab62d7102844b278fe6dead3af32408b1df3eb06f5c7e8634cbd40edc4da53"},
@@ -1972,7 +1956,7 @@ description = "A python wrapper of the C library 'Google CRC32C'"
 optional = true
 python-versions = ">=3.9"
 groups = ["main"]
-markers = "extra == \"gcsfs\" or extra == \"bigquery\""
+markers = "extra == \"bigquery\" or extra == \"gcsfs\""
 files = [
     {file = "google_crc32c-1.7.1-cp310-cp310-macosx_12_0_arm64.whl", hash = "sha256:b07d48faf8292b4db7c3d64ab86f950c2e94e93a11fd47271c28ba458e4a0d76"},
     {file = "google_crc32c-1.7.1-cp310-cp310-macosx_12_0_x86_64.whl", hash = "sha256:7cc81b3a2fbd932a4313eb53cc7d9dde424088ca3a0337160f35d91826880c1d"},
@@ -2020,7 +2004,7 @@ description = "Utilities for Google Media Downloads and Resumable Uploads"
 optional = true
 python-versions = ">=3.7"
 groups = ["main"]
-markers = "extra == \"gcsfs\" or extra == \"bigquery\""
+markers = "extra == \"bigquery\" or extra == \"gcsfs\""
 files = [
     {file = "google_resumable_media-2.7.2-py2.py3-none-any.whl", hash = "sha256:3ce7551e9fe6d99e9a126101d2536612bb73486721951e9562fee0f90c6ababa"},
     {file = "google_resumable_media-2.7.2.tar.gz", hash = "sha256:5280aed4629f2b60b847b0d42f9857fd4935c11af266744df33d8074cae92fe0"},
@@ -2040,7 +2024,7 @@ description = "Common protobufs used in Google APIs"
 optional = true
 python-versions = ">=3.7"
 groups = ["main"]
-markers = "extra == \"bigquery\" or extra == \"gcsfs\" or python_version <= \"3.10\" and (extra == \"gcsfs\" or extra == \"bigquery\")"
+markers = "extra == \"bigquery\" or extra == \"gcsfs\""
 files = [
     {file = "googleapis_common_protos-1.70.0-py3-none-any.whl", hash = "sha256:b8bfcca8c25a2bb253e0e0b0adaf8c00773e5e6af6fd92397576680b807e0fd8"},
     {file = "googleapis_common_protos-1.70.0.tar.gz", hash = "sha256:0e1b44e0ea153e6594f9f394fef15193a68aaaea2d843f83e2742717ca753257"},
@@ -2395,7 +2379,7 @@ description = "An ISO 8601 date/time/duration parser and formatter"
 optional = true
 python-versions = ">=3.7"
 groups = ["main"]
-markers = "extra == \"adlfs\""
+markers = "python_version >= \"3.10\" and extra == \"adlfs\""
 files = [
     {file = "isodate-0.7.2-py3-none-any.whl", hash = "sha256:28009937d8031054830160fce6d409ed342816b543597cece116d966c6d99e15"},
     {file = "isodate-0.7.2.tar.gz", hash = "sha256:4cd1aa0f43ca76f4a6c6c0292a85f40b35ec2e43e315b59f06e6d32171a953e6"},
@@ -2483,7 +2467,7 @@ files = [
     {file = "jmespath-1.0.1-py3-none-any.whl", hash = "sha256:02e2e4cc71b5bcab88332eebf907519190dd9e6e82107fa7f83b1003a6252980"},
     {file = "jmespath-1.0.1.tar.gz", hash = "sha256:90261b206d6defd58fdd5e85f478bf633a2901798906be2ad389150c5c60edbe"},
 ]
-markers = {main = "extra == \"dynamodb\" or extra == \"glue\" or extra == \"rest-sigv4\" or extra == \"s3fs\""}
+markers = {main = "extra == \"glue\" or extra == \"dynamodb\" or extra == \"rest-sigv4\" or extra == \"s3fs\""}
 
 [[package]]
 name = "joserfc"
@@ -3228,7 +3212,7 @@ description = "The Microsoft Authentication Library (MSAL) for Python library en
 optional = true
 python-versions = ">=3.7"
 groups = ["main"]
-markers = "extra == \"adlfs\""
+markers = "python_version >= \"3.10\" and extra == \"adlfs\""
 files = [
     {file = "msal-1.32.3-py3-none-any.whl", hash = "sha256:b2798db57760b1961b142f027ffb7c8169536bf77316e99a0df5c4aaebb11569"},
     {file = "msal-1.32.3.tar.gz", hash = "sha256:5eea038689c78a5a70ca8ecbe1245458b55a857bd096efb6989c69ba15985d35"},
@@ -3249,7 +3233,7 @@ description = "Microsoft Authentication Library extensions (MSAL EX) provides a 
 optional = true
 python-versions = ">=3.9"
 groups = ["main"]
-markers = "extra == \"adlfs\""
+markers = "python_version >= \"3.10\" and extra == \"adlfs\""
 files = [
     {file = "msal_extensions-1.3.1-py3-none-any.whl", hash = "sha256:96d3de4d034504e969ac5e85bae8106c8373b5c6568e4c8fa7af2eca9dbe6bca"},
     {file = "msal_extensions-1.3.1.tar.gz", hash = "sha256:c5b0fd10f65ef62b5f1d62f4251d51cbcaf003fcedae8c91b040a488614be1a4"},
@@ -3343,7 +3327,7 @@ description = "multidict implementation"
 optional = true
 python-versions = ">=3.9"
 groups = ["main"]
-markers = "extra == \"adlfs\" or extra == \"gcsfs\" or extra == \"s3fs\""
+markers = "(extra == \"s3fs\" or extra == \"gcsfs\") and (extra == \"adlfs\" or extra == \"s3fs\" or extra == \"gcsfs\") or (extra == \"adlfs\" or extra == \"s3fs\" or extra == \"gcsfs\") and python_version >= \"3.10\""
 files = [
     {file = "multidict-6.4.4-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:8adee3ac041145ffe4488ea73fa0a622b464cc25340d98be76924d0cda8545ff"},
     {file = "multidict-6.4.4-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:b61e98c3e2a861035aaccd207da585bdcacef65fe01d7a0d07478efac005e028"},
@@ -3654,7 +3638,7 @@ description = "Fundamental package for array computing in Python"
 optional = true
 python-versions = ">=3.9"
 groups = ["main"]
-markers = "python_version < \"3.10\" and (extra == \"bodo\" or extra == \"pandas\" or extra == \"ray\")"
+markers = "python_version < \"3.10\" and (extra == \"pandas\" or extra == \"ray\" or extra == \"bodo\")"
 files = [
     {file = "numpy-2.0.2-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:51129a29dbe56f9ca83438b706e2e69a39892b5eda6cedcb6b0c9fdc9b0d3ece"},
     {file = "numpy-2.0.2-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:f15975dfec0cf2239224d80e32c3170b1d168335eaedee69da84fbe9f1f9cd04"},
@@ -3710,7 +3694,7 @@ description = "Fundamental package for array computing in Python"
 optional = true
 python-versions = ">=3.10"
 groups = ["main"]
-markers = "python_version >= \"3.10\" and (extra == \"bodo\" or extra == \"pandas\" or extra == \"ray\")"
+markers = "python_version >= \"3.10\" and (extra == \"pandas\" or extra == \"ray\" or extra == \"bodo\")"
 files = [
     {file = "numpy-2.2.6-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:b412caa66f72040e6d268491a59f2c43bf03eb6c96dd8f0307829feb7fa2b6fb"},
     {file = "numpy-2.2.6-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:8e41fd67c52b86603a91c1a505ebaef50b3314de0213461c7a6e99c9a3beff90"},
@@ -3858,7 +3842,7 @@ description = "Powerful data structures for data analysis, time series, and stat
 optional = true
 python-versions = ">=3.9"
 groups = ["main"]
-markers = "extra == \"bodo\" or extra == \"pandas\" or extra == \"ray\""
+markers = "extra == \"pandas\" or extra == \"ray\" or extra == \"bodo\""
 files = [
     {file = "pandas-2.3.2-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:52bc29a946304c360561974c6542d1dd628ddafa69134a7131fdfd6a5d7a1a35"},
     {file = "pandas-2.3.2-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:220cc5c35ffaa764dd5bb17cf42df283b5cb7fdf49e10a7b053a06c9cb48ee2b"},
@@ -4079,7 +4063,7 @@ description = "Accelerated property cache"
 optional = true
 python-versions = ">=3.9"
 groups = ["main"]
-markers = "extra == \"adlfs\" or extra == \"gcsfs\" or extra == \"s3fs\""
+markers = "(extra == \"s3fs\" or extra == \"gcsfs\") and (extra == \"adlfs\" or extra == \"s3fs\" or extra == \"gcsfs\") or (extra == \"adlfs\" or extra == \"s3fs\" or extra == \"gcsfs\") and python_version >= \"3.10\""
 files = [
     {file = "propcache-0.3.2-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:22d9962a358aedbb7a2e36187ff273adeaab9743373a272976d2e348d08c7770"},
     {file = "propcache-0.3.2-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:0d0fda578d1dc3f77b6b5a5dce3b9ad69a8250a891760a548df850a5e8da87f3"},
@@ -4188,7 +4172,7 @@ description = "Beautiful, Pythonic protocol buffers"
 optional = true
 python-versions = ">=3.7"
 groups = ["main"]
-markers = "(python_version < \"3.12\" or python_version >= \"3.13\" or extra == \"bigquery\" or extra == \"gcsfs\") and (extra == \"gcsfs\" or extra == \"bigquery\")"
+markers = "extra == \"bigquery\" or extra == \"gcsfs\""
 files = [
     {file = "proto_plus-1.26.1-py3-none-any.whl", hash = "sha256:13285478c2dcf2abb829db158e1047e2f1e8d63a077d94263c2b88b043c75a66"},
     {file = "proto_plus-1.26.1.tar.gz", hash = "sha256:21a515a4c4c0088a773899e23c7bbade3d18f9c66c73edd4c7ee3816bc96a012"},
@@ -4207,7 +4191,7 @@ description = ""
 optional = true
 python-versions = ">=3.9"
 groups = ["main"]
-markers = "(extra == \"gcsfs\" or extra == \"bigquery\") and (extra == \"gcsfs\" or extra == \"bigquery\" or extra == \"ray\")"
+markers = "(extra == \"bigquery\" or extra == \"gcsfs\") and (extra == \"bigquery\" or extra == \"gcsfs\" or extra == \"ray\")"
 files = [
     {file = "protobuf-6.31.1-cp310-abi3-win32.whl", hash = "sha256:7fa17d5a29c2e04b7d90e5e32388b8bfd0e7107cd8e616feef7ed3fa6bdab5c9"},
     {file = "protobuf-6.31.1-cp310-abi3-win_amd64.whl", hash = "sha256:426f59d2964864a1a366254fa703b8632dcec0790d8862d30034d8245e1cd447"},
@@ -4374,7 +4358,7 @@ description = "Python library for Apache Arrow"
 optional = true
 python-versions = ">=3.9"
 groups = ["main"]
-markers = "extra == \"bodo\" or extra == \"daft\" or extra == \"datafusion\" or extra == \"duckdb\" or extra == \"pandas\" or extra == \"pyarrow\" or extra == \"ray\""
+markers = "extra == \"pyarrow\" or extra == \"pandas\" or extra == \"duckdb\" or extra == \"ray\" or extra == \"bodo\" or extra == \"daft\" or extra == \"datafusion\""
 files = [
     {file = "pyarrow-19.0.1-cp310-cp310-macosx_12_0_arm64.whl", hash = "sha256:fc28912a2dc924dddc2087679cc8b7263accc71b9ff025a1362b004711661a69"},
     {file = "pyarrow-19.0.1-cp310-cp310-macosx_12_0_x86_64.whl", hash = "sha256:fca15aabbe9b8355800d923cc2e82c8ef514af321e18b437c3d782aa884eaeec"},
@@ -4430,7 +4414,7 @@ description = "Pure-Python implementation of ASN.1 types and DER/BER/CER codecs 
 optional = true
 python-versions = ">=3.8"
 groups = ["main"]
-markers = "extra == \"gcsfs\" or extra == \"bigquery\" or extra == \"gcp-auth\""
+markers = "extra == \"gcp-auth\" or extra == \"bigquery\" or extra == \"gcsfs\""
 files = [
     {file = "pyasn1-0.6.1-py3-none-any.whl", hash = "sha256:0d632f46f2ba09143da3a8afe9e33fb6f92fa2320ab7e886e2d0f7672af84629"},
     {file = "pyasn1-0.6.1.tar.gz", hash = "sha256:6f580d2bdd84365380830acf45550f2511469f673cb4a5ae3857a3170128b034"},
@@ -4443,7 +4427,7 @@ description = "A collection of ASN.1-based protocols modules"
 optional = true
 python-versions = ">=3.8"
 groups = ["main"]
-markers = "extra == \"gcsfs\" or extra == \"bigquery\" or extra == \"gcp-auth\""
+markers = "extra == \"gcp-auth\" or extra == \"bigquery\" or extra == \"gcsfs\""
 files = [
     {file = "pyasn1_modules-0.4.2-py3-none-any.whl", hash = "sha256:29253a9207ce32b64c3ac6600edc75368f98473906e8fd1043bd6b5b1de2c14a"},
     {file = "pyasn1_modules-0.4.2.tar.gz", hash = "sha256:677091de870a80aae844b1ca6134f54652fa2c8c5a52aa396440ac3106e941e6"},
@@ -4463,7 +4447,7 @@ files = [
     {file = "pycparser-2.22-py3-none-any.whl", hash = "sha256:c3702b6d3dd8c7abc1afa565d7e63d53a1d0bd86cdc24edd75470f4de499cfcc"},
     {file = "pycparser-2.22.tar.gz", hash = "sha256:491c8be9c040f5390f5bf44a5b07752bd07f56edf992381b05c701439eec10f6"},
 ]
-markers = {main = "(extra == \"zstandard\" or extra == \"adlfs\") and platform_python_implementation == \"PyPy\" or extra == \"adlfs\"", dev = "platform_python_implementation != \"PyPy\""}
+markers = {main = "platform_python_implementation == \"PyPy\" and extra == \"zstandard\" or platform_python_implementation != \"PyPy\" and extra == \"adlfs\" and python_version >= \"3.10\" or extra == \"adlfs\" and extra == \"zstandard\" and python_version >= \"3.10\"", dev = "platform_python_implementation != \"PyPy\""}
 
 [[package]]
 name = "pydantic"
@@ -4638,7 +4622,7 @@ description = "JSON Web Token implementation in Python"
 optional = true
 python-versions = ">=3.9"
 groups = ["main"]
-markers = "extra == \"adlfs\""
+markers = "python_version >= \"3.10\" and extra == \"adlfs\""
 files = [
     {file = "PyJWT-2.10.1-py3-none-any.whl", hash = "sha256:dcdd193e30abefd5debf142f9adfcdd2b58004e644f25406ffaebd50bd98dacb"},
     {file = "pyjwt-2.10.1.tar.gz", hash = "sha256:3cc5772eb20009233caf06e9d8a0577824723b44e6648ee0a2aedb6cf9381953"},
@@ -4928,7 +4912,7 @@ description = "World timezone definitions, modern and historical"
 optional = true
 python-versions = "*"
 groups = ["main"]
-markers = "extra == \"bodo\" or extra == \"pandas\" or extra == \"ray\""
+markers = "extra == \"pandas\" or extra == \"ray\" or extra == \"bodo\""
 files = [
     {file = "pytz-2025.2-py2.py3-none-any.whl", hash = "sha256:5ddf76296dd8c44c26eb8f4b6f35488f3ccbf6fbbd7adee0b7262d43f0ec2f00"},
     {file = "pytz-2025.2.tar.gz", hash = "sha256:360b9e3dbb49a209c21ad61809c7fb453643e048b38924c765813546746e81c3"},
@@ -5505,7 +5489,7 @@ description = "Pure-Python RSA implementation"
 optional = true
 python-versions = "<4,>=3.6"
 groups = ["main"]
-markers = "extra == \"gcsfs\" or extra == \"bigquery\" or extra == \"gcp-auth\""
+markers = "extra == \"gcp-auth\" or extra == \"bigquery\" or extra == \"gcsfs\""
 files = [
     {file = "rsa-4.9.1-py3-none-any.whl", hash = "sha256:68635866661c6836b8d39430f97a996acbd61bfa49406748ea243539fe239762"},
     {file = "rsa-4.9.1.tar.gz", hash = "sha256:e7bdbfdb5497da4c07dfd35530e1a902659db6ff241e39d9953cad06ebd0ae75"},
@@ -5547,7 +5531,7 @@ files = [
     {file = "s3transfer-0.11.3-py3-none-any.whl", hash = "sha256:ca855bdeb885174b5ffa95b9913622459d4ad8e331fc98eb01e6d5eb6a30655d"},
     {file = "s3transfer-0.11.3.tar.gz", hash = "sha256:edae4977e3a122445660c7c114bba949f9d191bae3b34a096f18a1c8c354527a"},
 ]
-markers = {main = "extra == \"dynamodb\" or extra == \"glue\" or extra == \"rest-sigv4\""}
+markers = {main = "extra == \"glue\" or extra == \"dynamodb\" or extra == \"rest-sigv4\""}
 
 [package.dependencies]
 botocore = ">=1.36.0,<2.0a.0"
@@ -6055,7 +6039,7 @@ description = "Fast, Extensible Progress Meter"
 optional = true
 python-versions = ">=3.7"
 groups = ["main"]
-markers = "extra == \"daft\" or extra == \"hf\""
+markers = "extra == \"hf\" or extra == \"daft\""
 files = [
     {file = "tqdm-4.67.1-py3-none-any.whl", hash = "sha256:26445eca388f82e72884e0d580d5464cd801a3ea01e63e5601bdff9ba6a48de2"},
     {file = "tqdm-4.67.1.tar.gz", hash = "sha256:f8aef9c52c08c13a65f30ea34f4e5aac3fd1a34959879d7e59e63027286627f2"},
@@ -6106,7 +6090,7 @@ description = "Provider of IANA time zone data"
 optional = true
 python-versions = ">=2"
 groups = ["main"]
-markers = "extra == \"bodo\" or extra == \"pandas\" or extra == \"ray\""
+markers = "extra == \"pandas\" or extra == \"ray\" or extra == \"bodo\""
 files = [
     {file = "tzdata-2025.2-py2.py3-none-any.whl", hash = "sha256:1a403fada01ff9221ca8044d701868fa132215d84beb92242d9acd2147f667a8"},
     {file = "tzdata-2025.2.tar.gz", hash = "sha256:b60a638fcc0daffadf82fe0f57e53d06bdec2f36c4df66280ae79bce6bd6f2b9"},
@@ -6340,7 +6324,7 @@ description = "Yet another URL library"
 optional = true
 python-versions = ">=3.9"
 groups = ["main"]
-markers = "extra == \"adlfs\" or extra == \"gcsfs\" or extra == \"s3fs\""
+markers = "(extra == \"s3fs\" or extra == \"gcsfs\") and (extra == \"adlfs\" or extra == \"s3fs\" or extra == \"gcsfs\") or (extra == \"adlfs\" or extra == \"s3fs\" or extra == \"gcsfs\") and python_version >= \"3.10\""
 files = [
     {file = "yarl-1.20.1-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:6032e6da6abd41e4acda34d75a816012717000fa6839f37124a47fcefc49bec4"},
     {file = "yarl-1.20.1-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:2c7b34d804b8cf9b214f05015c4fee2ebe7ed05cf581e7192c06555c71f4446a"},
@@ -6617,4 +6601,4 @@ zstandard = ["zstandard"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.9.2, !=3.9.7"
-content-hash = "8fc70526280cdc36eacd833af47c1f1675ffa5dd36f1510a8f2a6c3d9100817f"
+content-hash = "1418a5aed0696965fbc89910be763dea500aea7ace0aa352a6b99e8651bcb454"

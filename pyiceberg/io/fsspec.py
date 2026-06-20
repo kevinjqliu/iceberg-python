@@ -206,15 +206,13 @@ def _adls(properties: Properties) -> AbstractFileSystem:
     from azure.core.credentials import AccessToken
     from azure.core.credentials_async import AsyncTokenCredential
 
-    # Monkeypatch AzureBlobFileSystem._strip_protocol function
-    # adlfs expects abfs/abfss. For compatibility, convert wasb/wasbs to abfs/abfss
-    _original_strip_protocol = AzureBlobFileSystem._strip_protocol
+    adls_protocols = AzureBlobFileSystem.protocol
+    if isinstance(adls_protocols, str):
+        adls_protocols = (adls_protocols,)
+    adls_protocols = tuple(dict.fromkeys((*adls_protocols, "wasb", "wasbs")))
 
-    def strip_protocol_patch(cls, path: str):  # type: ignore
-        path = path.replace("wasb://", "abfs://").replace("wasbs://", "abfss://")
-        return _original_strip_protocol(path)
-
-    AzureBlobFileSystem._strip_protocol = classmethod(strip_protocol_patch)
+    class PyIcebergAzureBlobFileSystem(AzureBlobFileSystem):
+        protocol = adls_protocols
 
     for key, sas_token in {
         key.replace(f"{ADLS_SAS_TOKEN}.", ""): value for key, value in properties.items() if key.startswith(ADLS_SAS_TOKEN)
@@ -242,7 +240,7 @@ def _adls(properties: Properties) -> AbstractFileSystem:
     else:
         credential = properties.get(ADLS_CREDENTIAL)  # type: ignore
 
-    return AzureBlobFileSystem(
+    return PyIcebergAzureBlobFileSystem(
         connection_string=properties.get(ADLS_CONNECTION_STRING),
         credential=credential,
         account_name=properties.get(ADLS_ACCOUNT_NAME),

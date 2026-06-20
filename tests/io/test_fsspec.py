@@ -508,6 +508,20 @@ def test_fsspec_pickle_round_trip_aldfs(adls_fsspec_fileio: FsspecFileIO, adls_s
     _test_fsspec_pickle_round_trip(adls_fsspec_fileio, f"{adls_scheme}://tests/foo.txt")
 
 
+def test_fsspec_adls_adds_wasb_protocols_without_global_mutation() -> None:
+    from adlfs import AzureBlobFileSystem
+
+    original_protocol = AzureBlobFileSystem.protocol
+
+    fs = fsspec._adls({"adls.account-name": "account"})
+
+    assert "wasb" in fs.protocol
+    assert "wasbs" in fs.protocol
+    assert fs._strip_protocol("wasb://container/path/to/file") == "container/path/to/file"
+    assert fs._strip_protocol("wasbs://container/path/to/file") == "container/path/to/file"
+    assert AzureBlobFileSystem.protocol == original_protocol
+
+
 @pytest.mark.gcs
 def test_fsspec_new_input_file_gcs(fsspec_fileio_gcs: FsspecFileIO) -> None:
     """Test creating a new input file from a fsspec file-io"""
