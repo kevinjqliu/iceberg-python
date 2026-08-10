@@ -30,7 +30,15 @@ from pyiceberg.partitioning import PartitionField, PartitionSpec
 from pyiceberg.schema import Schema
 from pyiceberg.table import Table
 from pyiceberg.table.snapshots import Operation, Summary
-from pyiceberg.transforms import IdentityTransform
+from pyiceberg.transforms import (
+    BucketTransform,
+    DayTransform,
+    HourTransform,
+    IdentityTransform,
+    MonthTransform,
+    Transform,
+    YearTransform,
+)
 from pyiceberg.types import FloatType, IntegerType, LongType, NestedField, StringType, TimestampType
 
 
@@ -125,6 +133,116 @@ def test_partitioned_table_rewrite(spark: SparkSession, session_catalog: RestCat
     # We don't delete a whole partition, so there is only a overwrite
     assert [snapshot.summary.operation.value for snapshot in tbl.snapshots()] == ["append", "append", "overwrite"]
     assert tbl.scan().to_arrow().to_pydict() == {"number_partitioned": [11, 10], "number": [30, 30]}
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    ("transform", "transform_name"),
+    [
+        pytest.param(YearTransform(), "year", id="year"),
+        pytest.param(MonthTransform(), "month", id="month"),
+        pytest.param(DayTransform(), "day", id="day"),
+        pytest.param(HourTransform(), "hour", id="hour"),
+    ],
+)
+def test_delete_rewrites_file_partitioned_by_temporal_transform(
+    session_catalog: RestCatalog, transform: Transform[datetime, int], transform_name: str
+) -> None:
+    identifier = f"default.test_delete_rewrites_file_partitioned_by_{transform_name}"
+    schema = Schema(
+        NestedField(1, "key", StringType()),
+        NestedField(2, "value", IntegerType()),
+        NestedField(3, "ts", TimestampType()),
+    )
+    partition_spec = PartitionSpec(PartitionField(source_id=3, field_id=1000, transform=transform, name="ts_partition"))
+    try:
+        session_catalog.drop_table(identifier)
+    except NoSuchTableError:
+        pass
+    table = session_catalog.create_table(identifier, schema=schema, partition_spec=partition_spec)
+    arrow_schema = schema.as_arrow()
+    ts = datetime(2026, 1, 6, 12)
+    table.append(
+        pa.Table.from_pylist(
+            [
+                {"key": "a", "value": 1, "ts": ts},
+                {"key": "b", "value": 1, "ts": ts},
+            ],
+            schema=arrow_schema,
+        )
+    )
+
+    table.delete(EqualTo("key", "a"))
+
+    assert table.scan().to_arrow().select(["key", "value"]).to_pylist() == [{"key": "b", "value": 1}]
+
+
+@pytest.mark.integration
+def test_delete_rewrites_file_partitioned_by_bucket_transform(session_catalog: RestCatalog) -> None:
+    identifier = "default.test_delete_rewrites_file_partitioned_by_bucket"
+    schema = Schema(
+        NestedField(1, "key", StringType()),
+        NestedField(2, "value", IntegerType()),
+    )
+    transform: Transform[str, int] = BucketTransform(4)
+    partition_spec = PartitionSpec(PartitionField(source_id=1, field_id=1000, transform=transform, name="key_bucket"))
+    try:
+        session_catalog.drop_table(identifier)
+    except NoSuchTableError:
+        pass
+    table = session_catalog.create_table(identifier, schema=schema, partition_spec=partition_spec)
+    arrow_schema = schema.as_arrow()
+
+    assert transform.transform(StringType())("b") == transform.transform(StringType())("c")
+    table.append(
+        pa.Table.from_pylist(
+            [
+                {"key": "b", "value": 1},
+                {"key": "c", "value": 1},
+            ],
+            schema=arrow_schema,
+        )
+    )
+
+    table.delete(EqualTo("key", "b"))
+
+    assert table.scan().to_arrow().to_pylist() == [{"key": "c", "value": 1}]
+
+
+@pytest.mark.integration
+def test_delete_rewrites_file_written_with_historical_partition_spec(session_catalog: RestCatalog) -> None:
+    identifier = "default.test_delete_rewrites_file_written_with_historical_partition_spec"
+    schema = Schema(
+        NestedField(1, "key", StringType()),
+        NestedField(2, "value", IntegerType()),
+        NestedField(3, "ts", TimestampType()),
+    )
+    try:
+        session_catalog.drop_table(identifier)
+    except NoSuchTableError:
+        pass
+    table = session_catalog.create_table(
+        identifier,
+        schema=schema,
+        partition_spec=PartitionSpec(PartitionField(source_id=3, field_id=1000, transform=DayTransform(), name="ts_day")),
+        properties={"format-version": "2"},
+    )
+    arrow_schema = schema.as_arrow()
+    ts = datetime(2026, 1, 6, 12)
+    table.append(
+        pa.Table.from_pylist(
+            [
+                {"key": "a", "value": 1, "ts": ts},
+                {"key": "b", "value": 1, "ts": ts},
+            ],
+            schema=arrow_schema,
+        )
+    )
+    table.update_spec().remove_field("ts_day").add_field("ts", HourTransform(), "ts_hour").commit()
+
+    table.delete(EqualTo("key", "a"))
+
+    assert table.scan().to_arrow().select(["key", "value"]).to_pylist() == [{"key": "b", "value": 1}]
 
 
 @pytest.mark.integration

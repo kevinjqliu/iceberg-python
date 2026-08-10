@@ -14,6 +14,7 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+from datetime import datetime
 from pathlib import PosixPath
 
 import pyarrow as pa
@@ -26,11 +27,13 @@ from pyiceberg.exceptions import NoSuchTableError
 from pyiceberg.expressions import AlwaysTrue, And, EqualTo, Reference
 from pyiceberg.expressions.literals import LongLiteral
 from pyiceberg.io.pyarrow import schema_to_pyarrow
+from pyiceberg.partitioning import PartitionField, PartitionSpec
 from pyiceberg.schema import Schema
 from pyiceberg.table import Table, UpsertResult
 from pyiceberg.table.snapshots import Operation
 from pyiceberg.table.upsert_util import create_match_filter
-from pyiceberg.types import IntegerType, NestedField, StringType, StructType
+from pyiceberg.transforms import DayTransform
+from pyiceberg.types import IntegerType, NestedField, StringType, StructType, TimestampType
 from tests.catalog.test_base import InMemoryCatalog
 
 
@@ -117,6 +120,40 @@ def gen_target_iceberg_table(
 def assert_upsert_result(res: UpsertResult, expected_updated: int, expected_inserted: int) -> None:
     assert res.rows_updated == expected_updated, f"rows updated should be {expected_updated}, but got {res.rows_updated}"
     assert res.rows_inserted == expected_inserted, f"rows inserted should be {expected_inserted}, but got {res.rows_inserted}"
+
+
+def test_upsert_rewrites_file_partitioned_by_day_transform(catalog: Catalog) -> None:
+    identifier = "default.test_upsert_rewrites_file_partitioned_by_day_transform"
+    schema = Schema(
+        NestedField(1, "key", StringType()),
+        NestedField(2, "value", IntegerType()),
+        NestedField(3, "ts", TimestampType()),
+    )
+    partition_spec = PartitionSpec(PartitionField(source_id=3, field_id=1000, transform=DayTransform(), name="ts_day"))
+    table = catalog.create_table(identifier, schema=schema, partition_spec=partition_spec)
+    arrow_schema = schema.as_arrow()
+    ts = datetime(2026, 1, 6, 12)
+
+    table.append(
+        pa.Table.from_pylist(
+            [
+                {"key": "a", "value": 1, "ts": ts},
+                {"key": "b", "value": 1, "ts": ts},
+            ],
+            schema=arrow_schema,
+        )
+    )
+
+    result = table.upsert(
+        pa.Table.from_pylist([{"key": "a", "value": 2, "ts": ts}], schema=arrow_schema),
+        join_cols=["key"],
+    )
+
+    assert_upsert_result(result, expected_updated=1, expected_inserted=0)
+    assert sorted(table.scan().to_arrow().select(["key", "value"]).to_pylist(), key=lambda row: row["key"]) == [
+        {"key": "a", "value": 2},
+        {"key": "b", "value": 1},
+    ]
 
 
 @pytest.mark.parametrize(
