@@ -69,10 +69,12 @@ from pyiceberg.expressions.visitors import (
     BindVisitor,
     BooleanExpressionVisitor,
     BoundBooleanExpressionVisitor,
+    _build_partition_record_filter,
     _ExpressionEvaluator,
     _ManifestEvalVisitor,
     expression_evaluator,
     expression_to_plain_format,
+    manifest_evaluator,
     rewrite_not,
     rewrite_to_dnf,
     translate_column_names,
@@ -80,11 +82,14 @@ from pyiceberg.expressions.visitors import (
     visit_bound_predicate,
 )
 from pyiceberg.manifest import ManifestFile, PartitionFieldSummary
+from pyiceberg.partitioning import PartitionField, PartitionSpec
 from pyiceberg.schema import Accessor, Schema
+from pyiceberg.transforms import DayTransform
 from pyiceberg.typedef import Record
 from pyiceberg.types import (
     BinaryType,
     BooleanType,
+    DateType,
     DoubleType,
     FloatType,
     IcebergType,
@@ -92,6 +97,7 @@ from pyiceberg.types import (
     NestedField,
     PrimitiveType,
     StringType,
+    TimestampType,
 )
 
 
@@ -831,6 +837,24 @@ def _to_byte_buffer(field_type: IcebergType, val: Any) -> bytes:
 def _to_manifest_file(*partitions: PartitionFieldSummary) -> ManifestFile:
     """Helper to create a ManifestFile"""
     return ManifestFile.from_args(manifest_path="", manifest_length=0, partition_spec_id=0, partitions=partitions)
+
+
+def test_partition_record_filter_for_temporal_transform() -> None:
+    schema = Schema(NestedField(1, "ts", TimestampType()))
+    spec = PartitionSpec(PartitionField(1, 1000, DayTransform(), "ts_day"))
+    day_ordinal = 20459
+    day_bytes = to_bytes(DateType(), day_ordinal)
+    manifest = _to_manifest_file(
+        PartitionFieldSummary.from_args(
+            contains_null=False,
+            contains_nan=False,
+            lower_bound=day_bytes,
+            upper_bound=day_bytes,
+        )
+    )
+
+    assert manifest_evaluator(spec, schema, _build_partition_record_filter(spec, {Record(day_ordinal)}))(manifest)
+    assert not manifest_evaluator(spec, schema, _build_partition_record_filter(spec, {Record(day_ordinal - 1)}))(manifest)
 
 
 INT_MIN_VALUE = 30

@@ -50,8 +50,12 @@ from pyiceberg.expressions import (
     BoundStartsWith,
     BoundTerm,
     BoundUnaryPredicate,
+    EqualTo,
+    IsNaN,
+    IsNull,
     Not,
     Or,
+    Reference,
     UnboundPredicate,
 )
 from pyiceberg.manifest import DataFile, ManifestFile, PartitionFieldSummary
@@ -785,6 +789,38 @@ class _ManifestEvalVisitor(BoundBooleanExpressionVisitor[bool]):
 
     def visit_or(self, left_result: bool, right_result: bool) -> bool:
         return left_result or right_result
+
+
+def _build_partition_record_filter(partition_spec: PartitionSpec, partition_records: set[Record]) -> BooleanExpression:
+    """Build a filter matching any record of transformed partition values.
+
+    Values are ordered by the partition spec fields and bound directly to partition field names.
+
+    Returns:
+        A filter that matches when partition fields equal the values in any partition record.
+    """
+    if not partition_records:
+        return AlwaysFalse()
+
+    partition_fields = [field.name for field in partition_spec.fields]
+    if not partition_fields:
+        return AlwaysTrue()
+
+    per_record_exprs: list[BooleanExpression] = []
+    for partition_record in partition_records:
+        predicates: list[BooleanExpression] = []
+        for pos, partition_field in enumerate(partition_fields):
+            value = partition_record[pos]
+            reference = Reference(partition_field)
+            if value is None:
+                predicates.append(IsNull(reference))
+            elif isinstance(value, float) and math.isnan(value):
+                predicates.append(IsNaN(reference))
+            else:
+                predicates.append(EqualTo(reference, value))
+        per_record_exprs.append(And(*predicates) if len(predicates) > 1 else predicates[0])
+
+    return Or(*per_record_exprs) if len(per_record_exprs) > 1 else per_record_exprs[0]
 
 
 def manifest_evaluator(

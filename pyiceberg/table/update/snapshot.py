@@ -30,6 +30,7 @@ from pyiceberg.expressions import AlwaysFalse, BooleanExpression, Or
 from pyiceberg.expressions.visitors import (
     ROWS_MIGHT_NOT_MATCH,
     ROWS_MUST_MATCH,
+    _build_partition_record_filter,
     _InclusiveMetricsEvaluator,
     _StrictMetricsEvaluator,
     inclusive_projection,
@@ -71,7 +72,7 @@ from pyiceberg.table.update import (
     UpdatesAndRequirements,
     UpdateTableMetadata,
 )
-from pyiceberg.typedef import EMPTY_DICT, KeyDefaultDict, Record
+from pyiceberg.typedef import EMPTY_DICT, KeyDefaultDict
 from pyiceberg.utils.bin_packing import ListPacker
 from pyiceberg.utils.concurrent import ExecutorFactory
 from pyiceberg.utils.datetime import datetime_to_millis
@@ -211,9 +212,6 @@ class _SnapshotProducer(UpdateTableMetadata[U], Generic[U]):
                 return deleted_manifests
             else:
                 return []
-
-        # Updates self._predicate with computed partition predicate for manifest pruning
-        self._build_delete_files_partition_predicate()
 
         executor = ExecutorFactory.get_or_create()
 
@@ -367,25 +365,12 @@ class _SnapshotProducer(UpdateTableMetadata[U], Generic[U]):
         return KeyDefaultDict(self._build_partition_projection)
 
     def _build_manifest_evaluator(self, spec_id: int) -> Callable[[ManifestFile], bool]:
+        # TODO: Resolve historical specs with dropped source fields against a compatible schema.
         return manifest_evaluator(self.spec(spec_id), self.schema(), self.partition_filters[spec_id], self._case_sensitive)
 
     def delete_by_predicate(self, predicate: BooleanExpression, case_sensitive: bool = True) -> None:
         self._predicate = Or(self._predicate, predicate)
         self._case_sensitive = case_sensitive
-
-    def _build_delete_files_partition_predicate(self) -> None:
-        """Build BooleanExpression based on deleted data files partitions."""
-        partition_to_overwrite: dict[int, set[Record]] = {}
-        for data_file in self._deleted_data_files:
-            group = partition_to_overwrite.setdefault(data_file.spec_id, set())
-            group.add(data_file.partition)
-
-        for spec_id, partition_records in partition_to_overwrite.items():
-            self.delete_by_predicate(
-                self._transaction._build_partition_predicate(
-                    partition_records=partition_records, schema=self.schema(), spec=self.spec(spec_id)
-                )
-            )
 
 
 class _DeleteFiles(_SnapshotProducer["_DeleteFiles"]):
@@ -588,6 +573,15 @@ class _OverwriteFiles(_SnapshotProducer["_OverwriteFiles"]):
     Data and delete files were added and removed in a logical overwrite operation.
     """
 
+    def _build_delete_file_partition_filter(self, spec_id: int) -> BooleanExpression:
+        partitions = {data_file.partition for data_file in self._deleted_data_files if data_file.spec_id == spec_id}
+        return _build_partition_record_filter(self.spec(spec_id), partitions)
+
+    @cached_property
+    def partition_filters(self) -> KeyDefaultDict[int, BooleanExpression]:
+        """Build filters from stored file partitions, which are already in partition space."""
+        return KeyDefaultDict(self._build_delete_file_partition_filter)
+
     def _existing_manifests(self) -> list[ManifestFile]:
         """Determine if there are any existing manifest files."""
         existing_files = []
@@ -595,7 +589,6 @@ class _OverwriteFiles(_SnapshotProducer["_OverwriteFiles"]):
         manifest_evaluators: dict[int, Callable[[ManifestFile], bool]] = KeyDefaultDict(self._build_manifest_evaluator)
         if snapshot := self._transaction.table_metadata.snapshot_by_name(name=self._target_branch):
             for manifest_file in snapshot.manifests(io=self._io):
-                # Manifest does not contain rows that match the files to delete partitions
                 if not manifest_evaluators[manifest_file.partition_spec_id](manifest_file):
                     existing_files.append(manifest_file)
                     continue
