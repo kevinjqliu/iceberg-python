@@ -115,9 +115,8 @@ def get_rows_to_update(source_table: pa.Table, target_table: pa.Table, join_cols
         # When the target table is empty, there is nothing to update :)
         return source_table.schema.empty_table()
 
-    # We need to compare non_key_cols in Python as PyArrow
-    # 1. Cannot do a join when non-join columns have complex types
-    # 2. Cannot compare columns with complex types
+    # We need to join on the identifier columns only, as PyArrow cannot do a join when non-join
+    # columns have complex types
     # See: https://github.com/apache/arrow/issues/35785
     _validate_index_column_names(join_cols)
 
@@ -136,28 +135,36 @@ def get_rows_to_update(source_table: pa.Table, target_table: pa.Table, join_cols
     # Step 3: Perform an inner join to find which rows from source exist in target
     matching_indices = source_index.join(target_index, keys=list(join_cols_set), join_type="inner")
 
-    # Step 4: Compare all rows using Python
-    to_update_indices = []
-    for source_idx, target_idx in zip(
-        matching_indices[SOURCE_INDEX_COLUMN_NAME].to_pylist(),
-        matching_indices[TARGET_INDEX_COLUMN_NAME].to_pylist(),
-        strict=True,
-    ):
-        source_row = source_table.slice(source_idx, 1)
-        target_row = target_table.slice(target_idx, 1)
-
-        for key in non_key_cols:
-            source_val = source_row.column(key)[0].as_py()
-            target_val = target_row.column(key)[0].as_py()
-            if source_val != target_val:
-                to_update_indices.append(source_idx)
-                break
-
-    # Step 5: Take rows from source table using the indices and cast to target schema
-    if to_update_indices:
-        return source_table.take(to_update_indices)
-    else:
+    if len(matching_indices) == 0 or len(non_key_cols) == 0:
         return source_table.schema.empty_table()
+
+    # Step 4: Compare the non-key columns of the matched rows, one column at a time
+    matched_target = target_table.take(matching_indices[TARGET_INDEX_COLUMN_NAME])
+    # Cast to the target types, so the values are compared the way the join keys are matched
+    matched_source = source_table.take(matching_indices[SOURCE_INDEX_COLUMN_NAME]).cast(matched_target.schema)
+
+    differs = functools.reduce(
+        pc.or_, [_column_differs(matched_source.column(col), matched_target.column(col)) for col in non_key_cols]
+    )
+
+    # Step 5: Take the rows of the source table that hold a new value, in the order of the source
+    to_update = matching_indices.filter(differs).sort_by(SOURCE_INDEX_COLUMN_NAME)
+    return source_table.take(to_update[SOURCE_INDEX_COLUMN_NAME])
+
+
+def _column_differs(source_column: pa.ChunkedArray, target_column: pa.ChunkedArray) -> pa.ChunkedArray:
+    """Return a mask that is set for every row where the two columns hold a different value."""
+    if pa.types.is_nested(source_column.type):
+        # PyArrow cannot compare columns with complex types, so those are compared in Python
+        # See: https://github.com/apache/arrow/issues/35785
+        return pa.chunked_array(
+            [pa.array([s != t for s, t in zip(source_column.to_pylist(), target_column.to_pylist(), strict=True)], pa.bool_())]
+        )
+
+    # not_equal yields null wherever either side is null, so decide those rows on their nullness alone
+    both_null = pc.and_(pc.is_null(source_column), pc.is_null(target_column))
+    either_null = pc.or_(pc.is_null(source_column), pc.is_null(target_column))
+    return pc.if_else(either_null, pc.invert(both_null), pc.not_equal(source_column, target_column))
 
 
 def get_rows_to_insert(source_table: pa.Table, target_table: pa.Table, join_cols: list[str]) -> pa.Table:

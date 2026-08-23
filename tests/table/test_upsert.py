@@ -32,7 +32,7 @@ from pyiceberg.partitioning import PartitionField, PartitionSpec
 from pyiceberg.schema import Schema
 from pyiceberg.table import Table, UpsertResult
 from pyiceberg.table.snapshots import Operation
-from pyiceberg.table.upsert_util import create_scan_filter, get_rows_to_insert
+from pyiceberg.table.upsert_util import create_scan_filter, get_rows_to_insert, get_rows_to_update
 from pyiceberg.transforms import DayTransform
 from pyiceberg.types import IntegerType, NestedField, StringType, StructType, TimestampType
 from tests.catalog.test_base import InMemoryCatalog
@@ -521,6 +521,49 @@ def test_get_rows_to_insert() -> None:
     ]
     # Nothing to match against
     assert get_rows_to_insert(source, target.schema.empty_table(), ["order_id"]) == source
+
+
+def test_get_rows_to_update_compares_nulls_and_complex_types() -> None:
+    """A row needs updating when any non-key value changed, with null counting as a value."""
+    schema = pa.schema(
+        [
+            pa.field("id", pa.int32()),
+            pa.field("v", pa.string()),
+            pa.field("nested", pa.struct([pa.field("x", pa.int64())])),
+        ]
+    )
+    target = pa.Table.from_pylist(
+        [
+            {"id": 1, "v": "a", "nested": {"x": 1}},  # unchanged
+            {"id": 2, "v": None, "nested": {"x": 1}},  # null -> value
+            {"id": 3, "v": "c", "nested": {"x": 1}},  # value -> null
+            {"id": 4, "v": None, "nested": {"x": 1}},  # null -> null, unchanged
+            {"id": 5, "v": "e", "nested": {"x": 1}},  # only the struct changed
+        ],
+        schema=schema,
+    )
+    source = pa.Table.from_pylist(
+        [
+            {"id": 5, "v": "e", "nested": {"x": 2}},
+            {"id": 4, "v": None, "nested": {"x": 1}},
+            {"id": 3, "v": None, "nested": {"x": 1}},
+            {"id": 2, "v": "b", "nested": {"x": 1}},
+            {"id": 1, "v": "a", "nested": {"x": 1}},
+            {"id": 6, "v": "f", "nested": {"x": 1}},  # not in the target at all
+        ],
+        schema=schema,
+    )
+
+    # Returned in the order of the source table
+    assert [row["id"] for row in get_rows_to_update(source, target, ["id"]).to_pylist()] == [5, 3, 2]
+
+
+def test_get_rows_to_update_without_non_key_columns() -> None:
+    """A table that is all key columns can never have a row that needs updating."""
+    schema = pa.schema([pa.field("id", pa.int32())])
+    table = pa.Table.from_pylist([{"id": 1}, {"id": 2}], schema=schema)
+
+    assert get_rows_to_update(table, table, ["id"]) == schema.empty_table()
 
 
 def test_get_rows_to_insert_with_reserved_column_name() -> None:
