@@ -29,6 +29,18 @@ from pyiceberg.expressions import (
     Or,
 )
 
+# Reserved for joining the source and the target table on their row order
+SOURCE_INDEX_COLUMN_NAME = "__source_index"
+TARGET_INDEX_COLUMN_NAME = "__target_index"
+
+
+def _validate_index_column_names(join_cols: list[str]) -> None:
+    if SOURCE_INDEX_COLUMN_NAME in join_cols or TARGET_INDEX_COLUMN_NAME in join_cols:
+        raise ValueError(
+            f"{SOURCE_INDEX_COLUMN_NAME} and {TARGET_INDEX_COLUMN_NAME} are reserved for joining "
+            f"DataFrames, and cannot be used as column names"
+        ) from None
+
 
 def create_match_filter(df: pyarrow_table, join_cols: list[str]) -> BooleanExpression:
     unique_keys = df.select(join_cols).group_by(join_cols).aggregate([])
@@ -76,14 +88,7 @@ def get_rows_to_update(source_table: pa.Table, target_table: pa.Table, join_cols
     # 1. Cannot do a join when non-join columns have complex types
     # 2. Cannot compare columns with complex types
     # See: https://github.com/apache/arrow/issues/35785
-    SOURCE_INDEX_COLUMN_NAME = "__source_index"
-    TARGET_INDEX_COLUMN_NAME = "__target_index"
-
-    if SOURCE_INDEX_COLUMN_NAME in join_cols or TARGET_INDEX_COLUMN_NAME in join_cols:
-        raise ValueError(
-            f"{SOURCE_INDEX_COLUMN_NAME} and {TARGET_INDEX_COLUMN_NAME} are reserved for joining "
-            f"DataFrames, and cannot be used as column names"
-        ) from None
+    _validate_index_column_names(join_cols)
 
     # Step 1: Prepare source index with join keys and a marker index
     # Cast to target table schema, so we can do the join
@@ -122,3 +127,30 @@ def get_rows_to_update(source_table: pa.Table, target_table: pa.Table, join_cols
         return source_table.take(to_update_indices)
     else:
         return source_table.schema.empty_table()
+
+
+def get_rows_to_insert(source_table: pa.Table, target_table: pa.Table, join_cols: list[str]) -> pa.Table:
+    """
+    Return the rows of the source table that do not match any row in the target table.
+
+    The tables are joined on the identifier columns only, which keeps the row matching in
+    PyArrow instead of expanding the keys into a boolean expression over the source table.
+    """
+    if len(source_table) == 0 or len(target_table) == 0:
+        return source_table
+
+    _validate_index_column_names(join_cols)
+
+    # Cast the keys to the target types, so we can do the join
+    # See: https://github.com/apache/arrow/issues/37542
+    target_keys = target_table.select(join_cols)
+    source_keys = (
+        source_table.select(join_cols)
+        .cast(target_keys.schema)
+        .append_column(SOURCE_INDEX_COLUMN_NAME, pa.array(range(len(source_table))))
+    )
+
+    unmatched = source_keys.join(target_keys, keys=join_cols, join_type="left anti")
+
+    # The join does not preserve the order of the source table, so sort the indices back
+    return source_table.take(unmatched.sort_by(SOURCE_INDEX_COLUMN_NAME)[SOURCE_INDEX_COLUMN_NAME])

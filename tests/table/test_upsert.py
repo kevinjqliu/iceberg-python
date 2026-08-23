@@ -31,7 +31,7 @@ from pyiceberg.partitioning import PartitionField, PartitionSpec
 from pyiceberg.schema import Schema
 from pyiceberg.table import Table, UpsertResult
 from pyiceberg.table.snapshots import Operation
-from pyiceberg.table.upsert_util import create_match_filter
+from pyiceberg.table.upsert_util import create_match_filter, get_rows_to_insert
 from pyiceberg.transforms import DayTransform
 from pyiceberg.types import IntegerType, NestedField, StringType, StructType, TimestampType
 from tests.catalog.test_base import InMemoryCatalog
@@ -444,6 +444,47 @@ def test_create_match_filter_single_condition() -> None:
         EqualTo(term=Reference(name="order_id"), literal=LongLiteral(101)),
         EqualTo(term=Reference(name="order_line_id"), literal=LongLiteral(1)),
     )
+
+
+def test_get_rows_to_insert() -> None:
+    """The rows that do not match on the join columns are returned in the order of the source table."""
+    source = pa.Table.from_pylist(
+        [
+            {"order_id": 3, "order_line_id": 1, "extra": "c"},
+            {"order_id": 1, "order_line_id": 1, "extra": "a"},
+            {"order_id": 1, "order_line_id": 2, "extra": "b"},
+        ],
+        schema=pa.schema(
+            [pa.field("order_id", pa.int32()), pa.field("order_line_id", pa.int32()), pa.field("extra", pa.string())]
+        ),
+    )
+    # The target is read back from the table, and can have different - but compatible - types
+    target = pa.Table.from_pylist(
+        [
+            {"order_id": 1, "order_line_id": 1, "extra": "a"},
+        ],
+        schema=pa.schema(
+            [pa.field("order_id", pa.int32()), pa.field("order_line_id", pa.int32()), pa.field("extra", pa.large_string())]
+        ),
+    )
+
+    assert get_rows_to_insert(source, target, ["order_id", "order_line_id"]).to_pylist() == [
+        {"order_id": 3, "order_line_id": 1, "extra": "c"},
+        {"order_id": 1, "order_line_id": 2, "extra": "b"},
+    ]
+    # Matching on a single column takes out both order lines of order 1
+    assert get_rows_to_insert(source, target, ["order_id"]).to_pylist() == [
+        {"order_id": 3, "order_line_id": 1, "extra": "c"},
+    ]
+    # Nothing to match against
+    assert get_rows_to_insert(source, target.schema.empty_table(), ["order_id"]) == source
+
+
+def test_get_rows_to_insert_with_reserved_column_name() -> None:
+    source = pa.Table.from_pylist([{"__source_index": 1}], schema=pa.schema([pa.field("__source_index", pa.int32())]))
+
+    with pytest.raises(ValueError, match="reserved for joining"):
+        get_rows_to_insert(source, source, ["__source_index"])
 
 
 def test_upsert_with_duplicate_rows_in_table(catalog: Catalog) -> None:

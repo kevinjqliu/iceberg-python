@@ -892,7 +892,6 @@ class Transaction:
         except ModuleNotFoundError as e:
             raise ModuleNotFoundError("For writes PyArrow needs to be installed") from e
 
-        from pyiceberg.io.pyarrow import expression_to_pyarrow
         from pyiceberg.table import upsert_util
 
         if join_cols is None:
@@ -962,12 +961,8 @@ class Transaction:
                     overwrite_predicates.append(overwrite_mask_predicate)
 
             if when_not_matched_insert_all:
-                expr_match = upsert_util.create_match_filter(rows, join_cols)
-                expr_match_bound = bind(self.table_metadata.schema(), expr_match, case_sensitive=case_sensitive)
-                expr_match_arrow = expression_to_pyarrow(expr_match_bound)
-
                 # Filter rows per batch.
-                rows_to_insert = rows_to_insert.filter(~expr_match_arrow)
+                rows_to_insert = upsert_util.get_rows_to_insert(rows_to_insert, rows, join_cols)
 
         update_row_cnt = 0
         insert_row_cnt = 0
