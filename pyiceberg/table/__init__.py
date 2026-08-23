@@ -892,6 +892,7 @@ class Transaction:
         except ModuleNotFoundError as e:
             raise ModuleNotFoundError("For writes PyArrow needs to be installed") from e
 
+        from pyiceberg.io.pyarrow import ArrowScan, _dataframe_to_data_files
         from pyiceberg.table import upsert_util
 
         if join_cols is None:
@@ -922,29 +923,41 @@ class Transaction:
             format_version=self.table_metadata.format_version,
         )
 
-        # get list of rows that exist so we don't have to load the entire target table
-        matched_predicate = upsert_util.create_match_filter(df, join_cols)
+        # Narrow the scan down to the files that can hold a matching key, so we don't have to load
+        # the entire target table. The exact matching is done in PyArrow below, so the key range is
+        # enough here, and it keeps the filter independent of the number of source rows.
+        scan_filter = upsert_util.create_scan_filter(df, join_cols)
 
         # We must use Transaction.table_metadata for the scan. This includes all uncommitted - but relevant - changes.
 
-        matched_iceberg_record_batches_scan = DataScan(
+        matched_iceberg_files_scan = DataScan(
             table_metadata=self.table_metadata,
             io=self._table.io,
-            row_filter=matched_predicate,
+            row_filter=scan_filter,
             case_sensitive=case_sensitive,
         )
 
         if branch in self.table_metadata.refs:
-            matched_iceberg_record_batches_scan = matched_iceberg_record_batches_scan.use_ref(branch)
+            matched_iceberg_files_scan = matched_iceberg_files_scan.use_ref(branch)
 
-        matched_iceberg_record_batches = matched_iceberg_record_batches_scan.to_arrow_batch_reader()
+        commit_uuid = uuid.uuid4()
+        counter = itertools.count(0)
 
-        batches_to_overwrite = []
-        overwrite_predicates = []
         rows_to_insert = df
+        replaced_files: list[tuple[DataFile, list[DataFile]]] = []
+        update_row_cnt = 0
+        insert_row_cnt = 0
 
-        for batch in matched_iceberg_record_batches:
-            rows = pa.Table.from_batches([batch])
+        for task in matched_iceberg_files_scan.plan_files():
+            # Read the file once. It is both the source of the matched rows, and - when any of those
+            # rows are updated - the file that gets rewritten.
+            rows = ArrowScan(
+                table_metadata=self.table_metadata,
+                io=self._table.io,
+                projected_schema=self.table_metadata.schema(),
+                row_filter=AlwaysTrue(),
+                case_sensitive=case_sensitive,
+            ).to_table(tasks=[task])
 
             if when_matched_update_all:
                 # function get_rows_to_update is doing a check on non-key columns to see if any of the
@@ -954,28 +967,42 @@ class Transaction:
                 rows_to_update = upsert_util.get_rows_to_update(df, rows, join_cols)
 
                 if len(rows_to_update) > 0:
-                    # build the match predicate filter
-                    overwrite_mask_predicate = upsert_util.create_match_filter(rows_to_update, join_cols)
+                    update_row_cnt += len(rows_to_update)
 
-                    batches_to_overwrite.append(rows_to_update)
-                    overwrite_predicates.append(overwrite_mask_predicate)
+                    # Rewrite the file with the updated rows in the place of the rows they replace,
+                    # rather than deleting the old rows and appending the new ones separately.
+                    merged_rows = upsert_util.replace_rows(rows, rows_to_update, join_cols)
+
+                    replaced_files.append(
+                        (
+                            task.file,
+                            list(
+                                _dataframe_to_data_files(
+                                    table_metadata=self.table_metadata,
+                                    df=merged_rows,
+                                    io=self._table.io,
+                                    write_uuid=commit_uuid,
+                                    counter=counter,
+                                )
+                            ),
+                        )
+                    )
 
             if when_not_matched_insert_all:
-                # Filter rows per batch.
+                # Filter rows per file.
                 rows_to_insert = upsert_util.get_rows_to_insert(rows_to_insert, rows, join_cols)
 
-        update_row_cnt = 0
-        insert_row_cnt = 0
-
-        if batches_to_overwrite:
-            rows_to_update = pa.concat_tables(batches_to_overwrite)
-            update_row_cnt = len(rows_to_update)
-            self.overwrite(
-                rows_to_update,
-                overwrite_filter=Or(*overwrite_predicates) if len(overwrite_predicates) > 1 else overwrite_predicates[0],
-                branch=branch,
-                snapshot_properties=snapshot_properties,
-            )
+        if replaced_files:
+            # Replace the matched files by identity instead of deleting by predicate. The files are
+            # already known from the scan, and _OverwriteFiles derives both the manifest pruning and
+            # the conflict detection from the partition records of the files being deleted.
+            with self.update_snapshot(snapshot_properties=snapshot_properties, branch=branch).overwrite(
+                commit_uuid=commit_uuid
+            ) as overwrite_snapshot:
+                for original_data_file, merged_data_files in replaced_files:
+                    overwrite_snapshot.delete_data_file(original_data_file)
+                    for merged_data_file in merged_data_files:
+                        overwrite_snapshot.append_data_file(merged_data_file)
 
         if when_not_matched_insert_all:
             insert_row_cnt = len(rows_to_insert)

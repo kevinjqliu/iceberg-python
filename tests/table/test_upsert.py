@@ -24,14 +24,14 @@ from pyarrow import Table as pa_table
 
 from pyiceberg.catalog import Catalog
 from pyiceberg.exceptions import NoSuchTableError
-from pyiceberg.expressions import AlwaysTrue, And, EqualTo, Reference
+from pyiceberg.expressions import AlwaysFalse, AlwaysTrue, And, EqualTo, GreaterThanOrEqual, LessThanOrEqual, Reference
 from pyiceberg.expressions.literals import LongLiteral
 from pyiceberg.io.pyarrow import schema_to_pyarrow
 from pyiceberg.partitioning import PartitionField, PartitionSpec
 from pyiceberg.schema import Schema
 from pyiceberg.table import Table, UpsertResult
 from pyiceberg.table.snapshots import Operation
-from pyiceberg.table.upsert_util import create_match_filter, get_rows_to_insert
+from pyiceberg.table.upsert_util import create_scan_filter, get_rows_to_insert
 from pyiceberg.transforms import DayTransform
 from pyiceberg.types import IntegerType, NestedField, StringType, StructType, TimestampType
 from tests.catalog.test_base import InMemoryCatalog
@@ -375,7 +375,9 @@ def test_upsert_with_identifier_fields(catalog: Catalog) -> None:
     )
     upd = tbl.upsert(df)
 
-    expected_operations = [Operation.APPEND, Operation.OVERWRITE, Operation.APPEND, Operation.APPEND]
+    # The updated row is written into the file that is rewritten for it, so the upsert commits the
+    # rewrite and the insert, and no longer a separate append for the updated row itself
+    expected_operations = [Operation.APPEND, Operation.OVERWRITE, Operation.APPEND]
 
     assert upd.rows_updated == 1
     assert upd.rows_inserted == 1
@@ -427,10 +429,10 @@ def test_upsert_into_empty_table(catalog: Catalog) -> None:
     assert upd.rows_inserted == 4
 
 
-def test_create_match_filter_single_condition() -> None:
+def test_create_scan_filter_single_condition() -> None:
     """
-    Test create_match_filter with a composite key where the source yields exactly one unique key.
-    Expected: The function returns the single And condition directly.
+    Test create_scan_filter with a composite key where the source yields exactly one unique key.
+    Expected: The bounds collapse to a single EqualTo per join column.
     """
 
     data = [
@@ -439,11 +441,38 @@ def test_create_match_filter_single_condition() -> None:
     ]
     schema = pa.schema([pa.field("order_id", pa.int32()), pa.field("order_line_id", pa.int32()), pa.field("extra", pa.string())])
     table = pa.Table.from_pylist(data, schema=schema)
-    expr = create_match_filter(table, ["order_id", "order_line_id"])
+    expr = create_scan_filter(table, ["order_id", "order_line_id"])
     assert expr == And(
         EqualTo(term=Reference(name="order_id"), literal=LongLiteral(101)),
         EqualTo(term=Reference(name="order_line_id"), literal=LongLiteral(1)),
     )
+
+
+def test_create_scan_filter_is_a_key_range() -> None:
+    """The filter stays the same size no matter how many rows the source has."""
+    schema = pa.schema([pa.field("order_id", pa.int32()), pa.field("order_line_id", pa.int32())])
+    table = pa.Table.from_pylist(
+        [{"order_id": order_id, "order_line_id": 1} for order_id in (5, 1, 3)],
+        schema=schema,
+    )
+
+    assert create_scan_filter(table, ["order_id", "order_line_id"]) == And(
+        And(
+            GreaterThanOrEqual(term=Reference(name="order_id"), literal=LongLiteral(1)),
+            LessThanOrEqual(term=Reference(name="order_id"), literal=LongLiteral(5)),
+        ),
+        EqualTo(term=Reference(name="order_line_id"), literal=LongLiteral(1)),
+    )
+
+    assert create_scan_filter(schema.empty_table(), ["order_id"]) == AlwaysFalse()
+
+
+def test_create_scan_filter_rejects_null_keys() -> None:
+    schema = pa.schema([pa.field("order_id", pa.int32())])
+    table = pa.Table.from_pylist([{"order_id": 1}, {"order_id": None}], schema=schema)
+
+    with pytest.raises(ValueError, match="Join columns cannot contain null values, but order_id does"):
+        create_scan_filter(table, ["order_id"])
 
 
 def test_get_rows_to_insert() -> None:
