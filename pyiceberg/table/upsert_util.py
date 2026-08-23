@@ -26,8 +26,10 @@ from pyiceberg.expressions import (
     BooleanExpression,
     EqualTo,
     GreaterThanOrEqual,
+    In,
     LessThanOrEqual,
 )
+from pyiceberg.expressions.visitors import IN_PREDICATE_LIMIT
 
 # Reserved for joining the source and the target table on their row order
 SOURCE_INDEX_COLUMN_NAME = "__source_index"
@@ -45,27 +47,48 @@ def _validate_index_column_names(join_cols: list[str]) -> None:
 def create_scan_filter(df: pyarrow_table, join_cols: list[str]) -> BooleanExpression:
     """Build the filter that narrows the target table down to the files that can hold a matching key.
 
-    The filter is a range over the source keys per join column, so its size is bound by the number
-    of join columns instead of the number of source rows. It matches a superset of the rows that the
-    source can match; the exact matching is done in PyArrow once the rows have been read.
+    The filter only prunes; the exact matching is done in PyArrow once the rows have been read, so it
+    is free to match a superset of the rows that the source can match. Which superset is worth asking
+    for depends on how many keys the source has:
+
+    - Up to IN_PREDICATE_LIMIT keys the filter lists them, which lets the evaluators test every key
+      against the bounds of each file and skip the files that fall in a gap between the keys.
+    - Above that limit both the manifest and the metrics evaluator ignore a listed set and report that
+      every file might match, so the filter falls back to a bounded predicate per join column. That
+      keeps the pruning a low-cardinality column or a batch of consecutive keys allows, without the
+      filter growing with the source.
     """
-    if len(df) == 0:
+    unique_keys = df.select(join_cols).group_by(join_cols).aggregate([])
+
+    if len(unique_keys) == 0:
         return AlwaysFalse()
 
-    predicates: list[BooleanExpression] = []
     for col in join_cols:
-        keys = df.column(col)
-        if keys.null_count > 0:
+        if df.column(col).null_count > 0:
             raise ValueError(f"Join columns cannot contain null values, but {col} does. No upsert executed")
 
-        bounds = pc.min_max(keys).as_py()
-        if bounds["min"] == bounds["max"]:
-            predicates.append(EqualTo(col, bounds["min"]))
-        else:
-            predicates.append(GreaterThanOrEqual(col, bounds["min"]))
-            predicates.append(LessThanOrEqual(col, bounds["max"]))
+    if len(unique_keys) <= IN_PREDICATE_LIMIT:
+        if len(join_cols) == 1:
+            return In(join_cols[0], unique_keys[0].to_pylist())
 
-    return functools.reduce(operator.and_, predicates)
+        return functools.reduce(
+            operator.or_,
+            [functools.reduce(operator.and_, [EqualTo(col, row[col]) for col in join_cols]) for row in unique_keys.to_pylist()],
+        )
+
+    return functools.reduce(operator.and_, [_create_column_filter(unique_keys, col) for col in join_cols])
+
+
+def _create_column_filter(unique_keys: pyarrow_table, col: str) -> BooleanExpression:
+    """Build the widest useful predicate for a single join column that does not grow with the source."""
+    keys = unique_keys.column(col)
+    values = keys.unique()
+
+    if len(values) <= IN_PREDICATE_LIMIT:
+        return In(col, values.to_pylist())
+
+    bounds = pc.min_max(keys).as_py()
+    return GreaterThanOrEqual(col, bounds["min"]) & LessThanOrEqual(col, bounds["max"])
 
 
 def has_duplicate_rows(df: pyarrow_table, join_cols: list[str]) -> bool:

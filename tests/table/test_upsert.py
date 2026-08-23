@@ -24,8 +24,9 @@ from pyarrow import Table as pa_table
 
 from pyiceberg.catalog import Catalog
 from pyiceberg.exceptions import NoSuchTableError
-from pyiceberg.expressions import AlwaysFalse, AlwaysTrue, And, EqualTo, GreaterThanOrEqual, LessThanOrEqual, Reference
+from pyiceberg.expressions import AlwaysFalse, AlwaysTrue, And, EqualTo, GreaterThanOrEqual, In, LessThanOrEqual, Reference
 from pyiceberg.expressions.literals import LongLiteral
+from pyiceberg.expressions.visitors import IN_PREDICATE_LIMIT
 from pyiceberg.io.pyarrow import schema_to_pyarrow
 from pyiceberg.partitioning import PartitionField, PartitionSpec
 from pyiceberg.schema import Schema
@@ -448,23 +449,36 @@ def test_create_scan_filter_single_condition() -> None:
     )
 
 
-def test_create_scan_filter_is_a_key_range() -> None:
-    """The filter stays the same size no matter how many rows the source has."""
+def test_create_scan_filter_lists_the_keys_up_to_the_in_predicate_limit() -> None:
+    """Up to the limit the keys are listed, so the evaluators can skip the files between them."""
+    schema = pa.schema([pa.field("order_id", pa.int32())])
+    keys = list(range(IN_PREDICATE_LIMIT))
+    table = pa.Table.from_pylist([{"order_id": order_id} for order_id in keys], schema=schema)
+
+    assert create_scan_filter(table, ["order_id"]) == In("order_id", keys)
+
+    assert create_scan_filter(schema.empty_table(), ["order_id"]) == AlwaysFalse()
+
+
+def test_create_scan_filter_falls_back_per_column() -> None:
+    """Past the limit the evaluators ignore a listed set, so each column gets a bounded predicate.
+
+    A column that stays under the limit keeps its keys listed - a low-cardinality column such as a
+    partition date prunes far better that way than as a range.
+    """
     schema = pa.schema([pa.field("order_id", pa.int32()), pa.field("order_line_id", pa.int32())])
     table = pa.Table.from_pylist(
-        [{"order_id": order_id, "order_line_id": 1} for order_id in (5, 1, 3)],
+        [{"order_id": order_id, "order_line_id": 1} for order_id in range(IN_PREDICATE_LIMIT + 1)],
         schema=schema,
     )
 
     assert create_scan_filter(table, ["order_id", "order_line_id"]) == And(
         And(
-            GreaterThanOrEqual(term=Reference(name="order_id"), literal=LongLiteral(1)),
-            LessThanOrEqual(term=Reference(name="order_id"), literal=LongLiteral(5)),
+            GreaterThanOrEqual(term=Reference(name="order_id"), literal=LongLiteral(0)),
+            LessThanOrEqual(term=Reference(name="order_id"), literal=LongLiteral(IN_PREDICATE_LIMIT)),
         ),
         EqualTo(term=Reference(name="order_line_id"), literal=LongLiteral(1)),
     )
-
-    assert create_scan_filter(schema.empty_table(), ["order_id"]) == AlwaysFalse()
 
 
 def test_create_scan_filter_rejects_null_keys() -> None:
