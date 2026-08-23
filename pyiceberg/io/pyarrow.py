@@ -2965,7 +2965,7 @@ def _dataframe_to_data_files(
     df: pa.Table | pa.RecordBatchReader,
     io: FileIO,
     write_uuid: uuid.UUID | None = None,
-    counter: itertools.count[int] | None = None,
+    counter: Iterator[int] | None = None,
 ) -> Iterable[DataFile]:
     """Convert a PyArrow Table or RecordBatchReader into DataFiles.
 

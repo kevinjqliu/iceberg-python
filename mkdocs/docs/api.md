@@ -578,6 +578,18 @@ assert upd.rows_inserted == 1
 
 PyIceberg will automatically detect which rows need to be updated, inserted or can simply be ignored.
 
+An upsert is planned from table metadata before any data file is read. The key
+values of the incoming dataframe are used to prune manifests and data files -- and,
+on a partitioned table, are pushed through the partition transforms so that only
+the partitions that can hold a match are considered. Rows whose keys fall outside
+every remaining file are known to be new, and are inserted without reading
+anything. Whatever is left is resolved one data file at a time, in parallel; the
+number of threads and therefore the peak memory follow the `max-workers`
+[configuration](configuration.md).
+
+The whole operation commits as a single snapshot, so readers never see a
+partially applied merge.
+
 ## Inspecting tables
 
 To explore the table metadata, tables can be inspected.

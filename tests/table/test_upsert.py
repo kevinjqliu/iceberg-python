@@ -375,7 +375,10 @@ def test_upsert_with_identifier_fields(catalog: Catalog) -> None:
     )
     upd = tbl.upsert(df)
 
-    expected_operations = [Operation.APPEND, Operation.OVERWRITE, Operation.APPEND, Operation.APPEND]
+    # An upsert commits exactly once: the replaced files, the rows that replace
+    # them and the new rows all land in a single overwrite snapshot, so readers
+    # never observe a half-applied merge.
+    expected_operations = [Operation.APPEND, Operation.OVERWRITE]
 
     assert upd.rows_updated == 1
     assert upd.rows_inserted == 1
@@ -708,13 +711,11 @@ def test_upsert_with_nulls(catalog: Catalog) -> None:
     upd = table.upsert(data_without_null, join_cols=["foo"])
     assert upd.rows_updated == 1
     assert upd.rows_inserted == 0
-    assert table.scan().to_arrow() == pa.Table.from_pylist(
-        [
-            {"foo": "apple", "bar": 7, "baz": False},
-            {"foo": "banana", "bar": None, "baz": False},
-        ],
-        schema=schema,
-    )
+    # Row order is not part of the table contract, only the contents are.
+    assert sorted(table.scan().to_arrow().to_pylist(), key=lambda row: row["foo"]) == [
+        {"foo": "apple", "bar": 7, "baz": False},
+        {"foo": "banana", "bar": None, "baz": False},
+    ]
 
 
 def test_upsert_on_table_partitioned_by_transform(catalog: Catalog) -> None:
@@ -927,3 +928,39 @@ def test_upsert_snapshot_properties(catalog: Catalog) -> None:
     for snapshot in snapshots[initial_snapshot_count:]:
         assert snapshot.summary is not None
         assert snapshot.summary.additional_properties.get("test_prop") == "test_value"
+
+
+def test_upsert_after_schema_evolution(catalog: Catalog) -> None:
+    """Upsert has to keep working after a column is added to the table.
+
+    The rows being compared are read projected onto the table's current schema,
+    so a data file written before the new column simply reads it as null rather
+    than making the source and target schemas disagree.
+    """
+    identifier = "default.test_upsert_after_schema_evolution"
+    _drop_table(catalog, identifier)
+
+    original = pa.table({"id": pa.array([1, 2], pa.int32()), "name": pa.array(["a", "b"], pa.string())})
+    catalog.create_table(identifier, original.schema)
+    tbl = catalog.load_table(identifier)
+    tbl.append(original)
+
+    evolved = pa.table(
+        {
+            "id": pa.array([1, 3], pa.int32()),
+            "name": pa.array(["A", "c"], pa.string()),
+            "ping": pa.array(["pong", "pong"], pa.string()),
+        }
+    )
+    with tbl.update_schema() as update_schema:
+        update_schema.union_by_name(evolved.schema)
+    tbl = tbl.refresh()
+
+    res = tbl.upsert(evolved, join_cols=["id"])
+
+    assert_upsert_result(res, expected_updated=1, expected_inserted=1)
+    assert sorted(tbl.scan().to_arrow().to_pylist(), key=lambda row: row["id"]) == [
+        {"id": 1, "name": "A", "ping": "pong"},
+        {"id": 2, "name": "b", "ping": None},
+        {"id": 3, "name": "c", "ping": "pong"},
+    ]

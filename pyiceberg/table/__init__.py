@@ -892,8 +892,16 @@ class Transaction:
         except ModuleNotFoundError as e:
             raise ModuleNotFoundError("For writes PyArrow needs to be installed") from e
 
-        from pyiceberg.io.pyarrow import expression_to_pyarrow
+        from pyiceberg.io.pyarrow import _check_pyarrow_schema_compatible, _dataframe_to_data_files
         from pyiceberg.table import upsert_util
+        from pyiceberg.table.upsert import (
+            SourceIndex,
+            ThreadSafeCounter,
+            UpsertPlan,
+            UpsertPlanner,
+            execute_upsert_plan,
+            rows_to_insert,
+        )
 
         if join_cols is None:
             join_cols = []
@@ -913,8 +921,6 @@ class Transaction:
         if upsert_util.has_duplicate_rows(df, join_cols):
             raise ValueError("Duplicate rows found in source dataset based on the key columns. No upsert executed")
 
-        from pyiceberg.io.pyarrow import _check_pyarrow_schema_compatible
-
         downcast_ns_timestamp_to_us = Config().get_bool(DOWNCAST_NS_TIMESTAMP_TO_US_ON_WRITE) or False
         _check_pyarrow_schema_compatible(
             self.table_metadata.schema(),
@@ -923,69 +929,89 @@ class Transaction:
             format_version=self.table_metadata.format_version,
         )
 
-        # get list of rows that exist so we don't have to load the entire target table
-        matched_predicate = upsert_util.create_match_filter(df, join_cols)
-
-        # We must use Transaction.table_metadata for the scan. This includes all uncommitted - but relevant - changes.
-
-        matched_iceberg_record_batches_scan = DataScan(
-            table_metadata=self.table_metadata,
-            io=self._table.io,
-            row_filter=matched_predicate,
-            case_sensitive=case_sensitive,
+        # Plan: metadata only. We must use Transaction.table_metadata so that all
+        # uncommitted - but relevant - changes in this transaction are visible.
+        source_index = SourceIndex(df, join_cols, self.table_metadata.schema(), case_sensitive=case_sensitive)
+        snapshot = (
+            self.table_metadata.snapshot_by_name(branch)
+            if branch is not None and branch in self.table_metadata.refs
+            else self.table_metadata.current_snapshot()
         )
-
-        if branch in self.table_metadata.refs:
-            matched_iceberg_record_batches_scan = matched_iceberg_record_batches_scan.use_ref(branch)
-
-        matched_iceberg_record_batches = matched_iceberg_record_batches_scan.to_arrow_batch_reader()
-
-        batches_to_overwrite = []
-        overwrite_predicates = []
-        rows_to_insert = df
-
-        for batch in matched_iceberg_record_batches:
-            rows = pa.Table.from_batches([batch])
-
-            if when_matched_update_all:
-                # function get_rows_to_update is doing a check on non-key columns to see if any of the
-                # values have actually changed. We don't want to do just a blanket overwrite for matched
-                # rows if the actual non-key column data hasn't changed.
-                # this extra step avoids unnecessary IO and writes
-                rows_to_update = upsert_util.get_rows_to_update(df, rows, join_cols)
-
-                if len(rows_to_update) > 0:
-                    # build the match predicate filter
-                    overwrite_mask_predicate = upsert_util.create_match_filter(rows_to_update, join_cols)
-
-                    batches_to_overwrite.append(rows_to_update)
-                    overwrite_predicates.append(overwrite_mask_predicate)
-
-            if when_not_matched_insert_all:
-                expr_match = upsert_util.create_match_filter(rows, join_cols)
-                expr_match_bound = bind(self.table_metadata.schema(), expr_match, case_sensitive=case_sensitive)
-                expr_match_arrow = expression_to_pyarrow(expr_match_bound)
-
-                # Filter rows per batch.
-                rows_to_insert = rows_to_insert.filter(~expr_match_arrow)
-
-        update_row_cnt = 0
-        insert_row_cnt = 0
-
-        if batches_to_overwrite:
-            rows_to_update = pa.concat_tables(batches_to_overwrite)
-            update_row_cnt = len(rows_to_update)
-            self.overwrite(
-                rows_to_update,
-                overwrite_filter=Or(*overwrite_predicates) if len(overwrite_predicates) > 1 else overwrite_predicates[0],
-                branch=branch,
-                snapshot_properties=snapshot_properties,
+        if snapshot is None:
+            plan = UpsertPlan(
+                join_cols=join_cols,
+                tasks=[],
+                definitely_new=source_index.table,
+                candidate_source=source_index.table.schema.empty_table(),
+            )
+        else:
+            plan = UpsertPlanner(self.table_metadata, self._table.io, source_index, case_sensitive).plan(
+                snapshot.manifests(self._table.io)
             )
 
+        # Execute: each task reads one data file, matches it against its slice of
+        # the source, and writes what survives.
+        write_uuid = uuid.uuid4()
+        counter = ThreadSafeCounter()
+        results = execute_upsert_plan(plan, self.table_metadata, self._table.io, when_matched_update_all, write_uuid, counter)
+
+        matched = [result.matched_keys for result in results if len(result.matched_keys) > 0]
+        matched_keys = pa.concat_tables(matched) if matched else df.select(join_cols).schema.empty_table()
+        if when_matched_update_all and upsert_util.has_duplicate_rows(matched_keys, join_cols):
+            raise ValueError("Target table has duplicate rows, aborting upsert")
+
+        updated = [result.updated_rows for result in results if len(result.updated_rows) > 0]
+        rows_updated = pa.concat_tables(updated) if updated else None
+
+        rows_inserted = None
         if when_not_matched_insert_all:
-            insert_row_cnt = len(rows_to_insert)
-            if rows_to_insert:
-                self.append(rows_to_insert, branch=branch, snapshot_properties=snapshot_properties)
+            # `definitely_new` never touched a data file: metadata alone proved
+            # those keys are absent. The rest needs one anti-join against what the
+            # tasks reported matching.
+            unmatched = rows_to_insert(plan.candidate_source, matched_keys, join_cols)
+            new_rows = [rows for rows in (plan.definitely_new, unmatched) if len(rows) > 0]
+            rows_inserted = pa.concat_tables(new_rows) if len(new_rows) > 1 else (new_rows[0] if new_rows else None)
+
+        update_row_cnt = len(rows_updated) if rows_updated is not None else 0
+        insert_row_cnt = len(rows_inserted) if rows_inserted is not None else 0
+
+        replaced = [result for result in results if result.replaced]
+        payload = [rows for rows in (rows_updated, rows_inserted) if rows is not None]
+        if not replaced and not payload:
+            return UpsertResult()
+
+        # Write before committing, the way `dynamic_partition_overwrite` does: the
+        # table does not change until the commit references these files.
+        payload_files = (
+            list(
+                _dataframe_to_data_files(
+                    table_metadata=self.table_metadata,
+                    df=pa.concat_tables(payload) if len(payload) > 1 else payload[0],
+                    io=self._table.io,
+                    write_uuid=write_uuid,
+                    counter=counter,
+                )
+            )
+            if payload
+            else []
+        )
+
+        # Commit: one snapshot, and pure metadata - every file below already exists.
+        if replaced:
+            # Files are removed by reference rather than by predicate, so manifest
+            # pruning is derived from the partitions of the files being deleted and
+            # always projects onto the spec.
+            with self.update_snapshot(snapshot_properties=snapshot_properties, branch=branch).overwrite() as overwrite_snapshot:
+                for result in replaced:
+                    overwrite_snapshot.delete_data_file(result.file)
+                    for data_file in result.added_files:
+                        overwrite_snapshot.append_data_file(data_file)
+                for data_file in payload_files:
+                    overwrite_snapshot.append_data_file(data_file)
+        else:
+            with self._append_snapshot_producer(snapshot_properties, branch=branch) as append_files:
+                for data_file in payload_files:
+                    append_files.append_data_file(data_file)
 
         return UpsertResult(rows_updated=update_row_cnt, rows_inserted=insert_row_cnt)
 
