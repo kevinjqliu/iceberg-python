@@ -228,6 +228,11 @@ def test_integer_not_aligned() -> None:
         assert resolve_reader(IntegerType(), StringType())
 
 
+def test_long_not_promoted_to_integer() -> None:
+    with pytest.raises(ResolveError, match="Cannot promote long to int"):
+        assert resolve_reader(LongType(), IntegerType())
+
+
 def test_float_not_aligned() -> None:
     with pytest.raises(ResolveError):
         assert resolve_reader(FloatType(), StringType())

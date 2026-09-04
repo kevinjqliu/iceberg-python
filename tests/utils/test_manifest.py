@@ -29,6 +29,7 @@ from pyiceberg.avro.file import AvroOutputFile
 from pyiceberg.io import load_file_io
 from pyiceberg.io.pyarrow import PyArrowFileIO
 from pyiceberg.manifest import (
+    DATA_FILE_TYPE,
     MANIFEST_ENTRY_SCHEMAS,
     MANIFEST_LIST_FILE_SCHEMAS,
     DataFile,
@@ -42,6 +43,7 @@ from pyiceberg.manifest import (
     _inherit_from_manifest,
     _manifests,
     clear_manifest_cache,
+    manifest_entry_schema_with_data_file,
     read_manifest_list,
     write_manifest,
     write_manifest_list,
@@ -50,7 +52,7 @@ from pyiceberg.partitioning import UNPARTITIONED_PARTITION_SPEC, PartitionSpec
 from pyiceberg.schema import Schema
 from pyiceberg.table.snapshots import Operation, Snapshot, Summary
 from pyiceberg.typedef import Record, TableVersion
-from pyiceberg.types import IntegerType, NestedField
+from pyiceberg.types import IntegerType, ListType, LongType, NestedField, StructType
 
 
 @pytest.fixture(autouse=True)
@@ -292,6 +294,100 @@ def test_read_manifest_entry_v3_fields(tmp_path: Path) -> None:
     assert delete_file.referenced_data_file == "s3://bucket/data.parquet"
     assert delete_file.content_offset == 1
     assert delete_file.content_size_in_bytes == 46
+
+
+def _data_file_with_equality_ids(equality_ids: list[int]) -> DataFile:
+    return DataFile.from_args(
+        content=DataFileContent.EQUALITY_DELETES,
+        file_path="s3://bucket/deletes.parquet",
+        file_format=FileFormat.PARQUET,
+        partition=Record(),
+        record_count=10,
+        file_size_in_bytes=1024,
+        equality_ids=equality_ids,
+    )
+
+
+def test_write_manifest_equality_ids_as_int(tmp_path: Path) -> None:
+    io = PyArrowFileIO()
+    manifest_path = str(tmp_path / "manifest.avro")
+    with write_manifest(
+        format_version=2,
+        spec=UNPARTITIONED_PARTITION_SPEC,
+        schema=Schema(NestedField(1, "foo", IntegerType(), False)),
+        output_file=io.new_output(manifest_path),
+        snapshot_id=1,
+        avro_compression="null",
+    ) as writer:
+        writer.add_entry(
+            ManifestEntry.from_args(
+                status=ManifestEntryStatus.ADDED,
+                snapshot_id=1,
+                sequence_number=1,
+                file_sequence_number=1,
+                data_file=_data_file_with_equality_ids([1, 2]),
+            )
+        )
+
+    # The spec requires equality_ids to be list<int>
+    with open(manifest_path, "rb") as f:
+        avro_schema = fastavro.reader(f).writer_schema
+    data_file_schema = next(field for field in avro_schema["fields"] if field["name"] == "data_file")["type"]
+    equality_ids_schema = next(field for field in data_file_schema["fields"] if field["name"] == "equality_ids")["type"]
+    assert equality_ids_schema == ["null", {"type": "array", "items": "int", "element-id": 136}]
+
+    entries = writer.to_manifest_file().fetch_manifest_entry(io)
+    assert entries[0].data_file.equality_ids == [1, 2]
+
+
+def _write_legacy_manifest(io: PyArrowFileIO, manifest_path: str, equality_ids: list[int]) -> ManifestFile:
+    """Write a manifest with equality_ids as list<long>, as older PyIceberg versions did."""
+    legacy_data_file_type = StructType(
+        *[
+            NestedField(135, "equality_ids", ListType(136, LongType()), required=False) if field.field_id == 135 else field
+            for field in DATA_FILE_TYPE[2].fields
+        ]
+    )
+    entry = ManifestEntry.from_args(
+        status=ManifestEntryStatus.ADDED,
+        snapshot_id=1,
+        sequence_number=1,
+        file_sequence_number=1,
+        data_file=_data_file_with_equality_ids(equality_ids),
+    )
+    with AvroOutputFile[ManifestEntry](
+        output_file=io.new_output(manifest_path),
+        file_schema=manifest_entry_schema_with_data_file(2, legacy_data_file_type),
+        record_schema=MANIFEST_ENTRY_SCHEMAS[2],
+        schema_name="manifest_entry",
+        metadata={"format-version": "2"},
+    ) as writer:
+        writer.write_block([entry])
+
+    return ManifestFile.from_args(
+        manifest_path=manifest_path,
+        manifest_length=0,
+        partition_spec_id=0,
+        added_snapshot_id=1,
+        sequence_number=1,
+        min_sequence_number=1,
+    )
+
+
+def test_read_manifest_legacy_equality_ids_as_long(tmp_path: Path) -> None:
+    io = PyArrowFileIO()
+    manifest = _write_legacy_manifest(io, str(tmp_path / "manifest.avro"), equality_ids=[1, 2])
+
+    entries = manifest.fetch_manifest_entry(io)
+    assert entries[0].data_file.equality_ids == [1, 2]
+
+
+def test_read_manifest_legacy_equality_ids_out_of_int_range(tmp_path: Path) -> None:
+    io = PyArrowFileIO()
+    manifest = _write_legacy_manifest(io, str(tmp_path / "manifest.avro"), equality_ids=[2**31])
+
+    with pytest.raises(ValueError, match="Cannot read long as int, value out of range: 2147483648"):
+        manifest.fetch_manifest_entry(io)
 
 
 def test_read_manifest_list(generated_manifest_file_file_v1: str) -> None:

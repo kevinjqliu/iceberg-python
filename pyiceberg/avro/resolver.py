@@ -30,6 +30,7 @@ from pyiceberg.avro.reader import (
     FloatReader,
     IntegerReader,
     ListReader,
+    LongToIntegerReader,
     MapReader,
     NoneReader,
     OptionReader,
@@ -108,6 +109,10 @@ from pyiceberg.types import (
 )
 
 STRUCT_ROOT = -1
+
+# Older PyIceberg versions wrote data_file.equality_ids as list<long>, while the spec requires list<int> (#3840).
+# Ints and longs share the same Avro encoding, so manifests with the legacy type can still be read as ints.
+LEGACY_EQUALITY_IDS_ELEMENT_PATH = [2, 135, 136]  # manifest_entry.data_file.equality_ids.element
 
 
 def construct_reader(
@@ -461,9 +466,18 @@ class ReadSchemaResolver(PrimitiveWithPartnerVisitor[IcebergType, Reader]):
 
             # ensure that the type can be projected to the expected
             if primitive != expected_primitive:
+                if self._is_legacy_equality_id(primitive, expected_primitive):
+                    return LongToIntegerReader()
                 promote(primitive, expected_primitive)
 
         return super().primitive(primitive, expected_primitive)
+
+    def _is_legacy_equality_id(self, primitive: PrimitiveType, expected_primitive: PrimitiveType) -> bool:
+        return (
+            self.context == LEGACY_EQUALITY_IDS_ELEMENT_PATH
+            and isinstance(primitive, LongType)
+            and isinstance(expected_primitive, IntegerType)
+        )
 
     def visit_boolean(self, boolean_type: BooleanType, partner: IcebergType | None) -> Reader:
         return BooleanReader()

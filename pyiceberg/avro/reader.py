@@ -132,6 +132,22 @@ class IntegerReader(Reader):
         decoder.skip_int()
 
 
+class LongToIntegerReader(Reader):
+    """Read a long from the file as an int, failing when the value does not fit in 32 bits.
+
+    This is deliberately not an IntegerReader, so that ListReader does not bypass the range check.
+    """
+
+    def read(self, decoder: BinaryDecoder) -> int:
+        value = decoder.read_int()
+        if not -(2**31) <= value < 2**31:
+            raise ValueError(f"Cannot read long as int, value out of range: {value}")
+        return value
+
+    def skip(self, decoder: BinaryDecoder) -> None:
+        decoder.skip_int()
+
+
 class FloatReader(Reader):
     def read(self, decoder: BinaryDecoder) -> float:
         return decoder.read_float()
