@@ -209,7 +209,7 @@ index 6c042475..7bb7e635 100644
  }
  
 diff --git a/bindings/python/tests/test_manifest.py b/bindings/python/tests/test_manifest.py
-index e024b280..95fd3a0b 100644
+index e024b280..70504e5b 100644
 --- a/bindings/python/tests/test_manifest.py
 +++ b/bindings/python/tests/test_manifest.py
 @@ -15,6 +15,7 @@
@@ -220,7 +220,7 @@ index e024b280..95fd3a0b 100644
  from typing import Any
  
  import pytest
-@@ -171,3 +172,47 @@ def test_read_manifest_entry(generated_manifest_entry_file: str) -> None:
+@@ -171,3 +172,49 @@ def test_read_manifest_entry(generated_manifest_entry_file: str) -> None:
      assert data_file.split_offsets == [4]
      assert data_file.equality_ids is None
      assert data_file.sort_order_id == 0
@@ -229,6 +229,8 @@ index e024b280..95fd3a0b 100644
 +def test_partition_values_are_typed(tmp_path: Path) -> None:
 +    """Partition values carry their Iceberg type: decimals keep their scale."""
 +    from decimal import Decimal
++
++    from pyiceberg_core import manifest
 +
 +    from pyiceberg.io.pyarrow import PyArrowFileIO
 +    from pyiceberg.manifest import write_manifest
