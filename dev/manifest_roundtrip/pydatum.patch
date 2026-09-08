@@ -1,0 +1,283 @@
+diff --git a/bindings/python/src/data_file.rs b/bindings/python/src/data_file.rs
+index b0e42e7d..30f085af 100644
+--- a/bindings/python/src/data_file.rs
++++ b/bindings/python/src/data_file.rs
+@@ -16,40 +16,69 @@
+ // under the License.
+ 
+ use std::collections::HashMap;
++use std::sync::Arc;
+ 
+-use iceberg::spec::{DataFile, DataFileFormat, PrimitiveLiteral};
++use iceberg::spec::{DataFile, DataFileFormat, Datum, PrimitiveLiteral, PrimitiveType, StructType};
+ use pyo3::IntoPyObjectExt;
+ use pyo3::exceptions::PyValueError;
+ use pyo3::prelude::*;
+ use pyo3::types::PyBytes;
+ 
+-#[pyclass()]
+-pub struct PyPrimitiveLiteral {
+-    inner: PrimitiveLiteral,
++/// A typed partition value: the Iceberg primitive type plus the literal, so
++/// decimals keep their scale and uuids come back as uuids.
++#[pyclass]
++pub struct PyDatum {
++    inner: Datum,
+ }
+ 
+ #[pymethods]
+-impl PyPrimitiveLiteral {
++impl PyDatum {
++    /// Iceberg type of this value, e.g. ``decimal(9, 2)``, ``uuid``, ``timestamp_ns``.
++    #[getter]
++    fn r#type(&self) -> String {
++        self.inner.data_type().to_string()
++    }
++
+     pub fn value(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+-        match &self.inner {
+-            PrimitiveLiteral::Boolean(v) => v.into_py_any(py),
+-            PrimitiveLiteral::Int(v) => v.into_py_any(py),
+-            PrimitiveLiteral::Long(v) => v.into_py_any(py),
+-            PrimitiveLiteral::Float(v) => v.0.into_py_any(py), // unwrap OrderedFloat
+-            PrimitiveLiteral::Double(v) => v.0.into_py_any(py),
+-            PrimitiveLiteral::String(v) => v.into_py_any(py),
+-            PrimitiveLiteral::Binary(v) => PyBytes::new(py, v).into_py_any(py),
+-            PrimitiveLiteral::Int128(v) => v.into_py_any(py), // Python handles big ints
+-            PrimitiveLiteral::UInt128(v) => v.into_py_any(py),
+-            PrimitiveLiteral::AboveMax => Err(PyValueError::new_err("AboveMax is not supported")),
+-            PrimitiveLiteral::BelowMin => Err(PyValueError::new_err("BelowMin is not supported")),
++        match (self.inner.data_type(), self.inner.literal()) {
++            // Datum's Display renders the scaled decimal ("123.45") and the hyphenated uuid.
++            (PrimitiveType::Decimal { .. }, PrimitiveLiteral::Int128(_)) => py
++                .import("decimal")?
++                .getattr("Decimal")?
++                .call1((self.inner.to_string(),))?
++                .into_py_any(py),
++            (PrimitiveType::Uuid, PrimitiveLiteral::UInt128(_)) => py
++                .import("uuid")?
++                .getattr("UUID")?
++                .call1((self.inner.to_string(),))?
++                .into_py_any(py),
++            (_, PrimitiveLiteral::Boolean(v)) => v.into_py_any(py),
++            (_, PrimitiveLiteral::Int(v)) => v.into_py_any(py),
++            (_, PrimitiveLiteral::Long(v)) => v.into_py_any(py),
++            (_, PrimitiveLiteral::Float(v)) => v.0.into_py_any(py), // unwrap OrderedFloat
++            (_, PrimitiveLiteral::Double(v)) => v.0.into_py_any(py),
++            (_, PrimitiveLiteral::String(v)) => v.into_py_any(py),
++            (_, PrimitiveLiteral::Binary(v)) => PyBytes::new(py, v).into_py_any(py),
++            (_, PrimitiveLiteral::Int128(v)) => v.into_py_any(py), // Python handles big ints
++            (_, PrimitiveLiteral::UInt128(v)) => v.into_py_any(py),
++            (_, PrimitiveLiteral::AboveMax) => {
++                Err(PyValueError::new_err("AboveMax is not supported"))
++            }
++            (_, PrimitiveLiteral::BelowMin) => {
++                Err(PyValueError::new_err("BelowMin is not supported"))
++            }
+         }
+     }
++
++    fn __repr__(&self) -> String {
++        format!("Datum({}, {})", self.inner.data_type(), self.inner)
++    }
+ }
+ 
+ #[pyclass]
+ pub struct PyDataFile {
+     inner: DataFile,
++    partition_type: Arc<StructType>,
+ }
+ 
+ #[pymethods]
+@@ -75,20 +104,31 @@ impl PyDataFile {
+     }
+ 
+     #[getter]
+-    fn partition(&self) -> Vec<Option<PyPrimitiveLiteral>> {
+-        self.inner
+-            .partition()
++    fn partition(&self) -> Vec<Option<PyDatum>> {
++        self.partition_type
++            .fields()
+             .iter()
+-            .map(|lit| {
+-                lit.and_then(|l| {
+-                    Some(PyPrimitiveLiteral {
+-                        inner: l.as_primitive_literal()?,
+-                    })
++            .zip(self.inner.partition().iter())
++            .map(|(field, lit)| {
++                let ty = field.field_type.as_primitive_type()?;
++                let lit = lit?.as_primitive_literal()?;
++                Some(PyDatum {
++                    inner: Datum::new(ty.clone(), lit),
+                 })
+             })
+             .collect()
+     }
+ 
++    /// Iceberg types of the partition fields, in spec order.
++    #[getter]
++    fn partition_types(&self) -> Vec<String> {
++        self.partition_type
++            .fields()
++            .iter()
++            .map(|f| f.field_type.to_string())
++            .collect()
++    }
++
+     #[getter]
+     fn record_count(&self) -> u64 {
+         self.inner.record_count()
+@@ -159,7 +199,10 @@ impl PyDataFile {
+ }
+ 
+ impl PyDataFile {
+-    pub fn new(inner: DataFile) -> Self {
+-        Self { inner }
++    pub fn new(inner: DataFile, partition_type: Arc<StructType>) -> Self {
++        Self {
++            inner,
++            partition_type,
++        }
+     }
+ }
+diff --git a/bindings/python/src/manifest.rs b/bindings/python/src/manifest.rs
+index 6c042475..7bb7e635 100644
+--- a/bindings/python/src/manifest.rs
++++ b/bindings/python/src/manifest.rs
+@@ -18,7 +18,7 @@
+ use std::sync::Arc;
+ 
+ use iceberg::spec::{
+-    FieldSummary, FormatVersion, Manifest, ManifestEntry, ManifestFile, ManifestList,
++    FieldSummary, FormatVersion, Manifest, ManifestEntry, ManifestFile, ManifestList, StructType,
+ };
+ use pyo3::prelude::*;
+ 
+@@ -27,6 +27,7 @@ use crate::data_file::PyDataFile;
+ #[pyclass]
+ pub struct PyManifest {
+     inner: Manifest,
++    partition_type: Arc<StructType>,
+ }
+ 
+ #[pymethods]
+@@ -41,6 +42,7 @@ impl PyManifest {
+             .iter()
+             .map(|entry| PyManifestEntry {
+                 inner: entry.clone(),
++                partition_type: self.partition_type.clone(),
+             })
+             .collect()
+     }
+@@ -164,6 +166,7 @@ impl PyManifestFile {
+ #[pyclass]
+ pub struct PyManifestEntry {
+     inner: Arc<ManifestEntry>,
++    partition_type: Arc<StructType>,
+ }
+ 
+ #[pymethods]
+@@ -190,15 +193,26 @@ impl PyManifestEntry {
+ 
+     #[getter]
+     fn data_file(&self) -> PyDataFile {
+-        PyDataFile::new(self.inner.data_file.clone())
++        PyDataFile::new(self.inner.data_file.clone(), self.partition_type.clone())
+     }
+ }
+ 
+ #[pyfunction]
+ pub fn read_manifest_entries(bs: &[u8]) -> PyManifest {
+     // TODO: Some error handling
++    let inner = Manifest::parse_avro(bs).unwrap();
++    // The manifest's own metadata carries the schema and spec it was written with,
++    // which is exactly the type information the partition literals lack.
++    let metadata = inner.metadata();
++    let partition_type = Arc::new(
++        metadata
++            .partition_spec
++            .partition_type(&metadata.schema)
++            .unwrap(),
++    );
+     PyManifest {
+-        inner: Manifest::parse_avro(bs).unwrap(),
++        inner,
++        partition_type,
+     }
+ }
+ 
+diff --git a/bindings/python/tests/test_manifest.py b/bindings/python/tests/test_manifest.py
+index e024b280..95fd3a0b 100644
+--- a/bindings/python/tests/test_manifest.py
++++ b/bindings/python/tests/test_manifest.py
+@@ -15,6 +15,7 @@
+ # specific language governing permissions and limitations
+ # under the License.
+ 
++from pathlib import Path
+ from typing import Any
+ 
+ import pytest
+@@ -171,3 +172,47 @@ def test_read_manifest_entry(generated_manifest_entry_file: str) -> None:
+     assert data_file.split_offsets == [4]
+     assert data_file.equality_ids is None
+     assert data_file.sort_order_id == 0
++
++
++def test_partition_values_are_typed(tmp_path: Path) -> None:
++    """Partition values carry their Iceberg type: decimals keep their scale."""
++    from decimal import Decimal
++
++    from pyiceberg.io.pyarrow import PyArrowFileIO
++    from pyiceberg.manifest import write_manifest
++    from pyiceberg.partitioning import PartitionField, PartitionSpec
++    from pyiceberg.schema import Schema
++    from pyiceberg.transforms import IdentityTransform
++    from pyiceberg.typedef import Record
++    from pyiceberg.types import DecimalType, IntegerType, NestedField
++
++    schema = Schema(
++        NestedField(1, "d", DecimalType(9, 2), required=False),
++        NestedField(2, "i", IntegerType(), required=False),
++        schema_id=0,
++    )
++    spec = PartitionSpec(
++        PartitionField(1, 1000, IdentityTransform(), "d"),
++        PartitionField(2, 1001, IdentityTransform(), "i"),
++        spec_id=0,
++    )
++    data_file = DataFile.from_args(
++        content=DataFileContent.DATA,
++        file_path="s3://bucket/file.parquet",
++        file_format=FileFormat.PARQUET,
++        partition=Record(Decimal("0.10"), None),
++        record_count=1,
++        file_size_in_bytes=1,
++    )
++    entry = ManifestEntry.from_args(status=ManifestEntryStatus.ADDED, snapshot_id=1, data_file=data_file)
++    path = str(tmp_path / "manifest.avro")
++    with write_manifest(2, spec, schema, PyArrowFileIO().new_output(path), 1, "deflate") as writer:
++        writer.add_entry(entry)
++
++    read_file = manifest.read_manifest_entries(Path(path).read_bytes()).entries()[0].data_file
++    assert read_file.partition_types == ["decimal(9, 2)", "int"]
++    decimal_value, null_value = read_file.partition
++    assert null_value is None
++    assert decimal_value.type == "decimal(9, 2)"
++    assert decimal_value.value() == Decimal("0.10")
++    assert decimal_value.value().as_tuple().exponent == -2
+diff --git a/crates/iceberg/src/spec/values/datum.rs b/crates/iceberg/src/spec/values/datum.rs
+index d5eccd83..10de4a0c 100644
+--- a/crates/iceberg/src/spec/values/datum.rs
++++ b/crates/iceberg/src/spec/values/datum.rs
+@@ -359,7 +359,7 @@ impl From<Datum> for PrimitiveLiteral {
+ 
+ impl Datum {
+     /// Creates a `Datum` from a `PrimitiveType` and a `PrimitiveLiteral`
+-    pub(crate) fn new(r#type: PrimitiveType, literal: PrimitiveLiteral) -> Self {
++    pub fn new(r#type: PrimitiveType, literal: PrimitiveLiteral) -> Self {
+         Datum { r#type, literal }
+     }
+ 
