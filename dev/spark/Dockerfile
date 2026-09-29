@@ -19,12 +19,13 @@ FROM apache/spark:${BASE_IMAGE_SPARK_VERSION}
 
 # Dependency versions - keep these compatible
 # Changing these will invalidate the JAR download cache layer
-ARG ICEBERG_VERSION=1.11.0
+ARG ICEBERG_VERSION=1.12.0
 ARG ICEBERG_SPARK_RUNTIME_VERSION=4.0_2.13
 ARG HADOOP_VERSION=3.4.1
 ARG AWS_SDK_VERSION=2.24.6
 ARG HIVE_METASTORE_VERSION=4.0.1
 ARG MAVEN_MIRROR=https://repo.maven.apache.org/maven2
+ARG ICEBERG_MAVEN_MIRROR=${MAVEN_MIRROR}
 
 USER root
 WORKDIR ${SPARK_HOME}
@@ -44,11 +45,20 @@ RUN mkdir -p "${SPARK_HOME}/hive-metastore-jars" && \
 
 # Download JARs with retry logic (most cacheable - only changes when versions change)
 # This is the slowest step, so we do it before copying config files
+# Iceberg JARs use ICEBERG_MAVEN_MIRROR (defaults to MAVEN_MIRROR, can be overridden for staging repos)
 RUN set -e && \
     cd "${SPARK_HOME}/jars" && \
     for jar_path in \
         "org/apache/iceberg/iceberg-spark-runtime-${ICEBERG_SPARK_RUNTIME_VERSION}/${ICEBERG_VERSION}/iceberg-spark-runtime-${ICEBERG_SPARK_RUNTIME_VERSION}-${ICEBERG_VERSION}.jar" \
-        "org/apache/iceberg/iceberg-aws-bundle/${ICEBERG_VERSION}/iceberg-aws-bundle-${ICEBERG_VERSION}.jar" \
+        "org/apache/iceberg/iceberg-aws-bundle/${ICEBERG_VERSION}/iceberg-aws-bundle-${ICEBERG_VERSION}.jar"; \
+    do \
+        jar_name=$(basename "${jar_path}") && \
+        curl -fsSL --retry 3 --retry-delay 5 \
+             -o "${jar_name}" \
+             "${ICEBERG_MAVEN_MIRROR}/${jar_path}" && \
+        chown spark:spark "${jar_name}"; \
+    done && \
+    for jar_path in \
         "org/apache/hadoop/hadoop-aws/${HADOOP_VERSION}/hadoop-aws-${HADOOP_VERSION}.jar" \
         "org/apache/hive/hive-standalone-metastore-common/${HIVE_METASTORE_VERSION}/hive-standalone-metastore-common-${HIVE_METASTORE_VERSION}.jar" \
         "software/amazon/awssdk/bundle/${AWS_SDK_VERSION}/bundle-${AWS_SDK_VERSION}.jar"; \

@@ -22,6 +22,7 @@ services:
       context: spark/
       args:
         MAVEN_MIRROR: ${MAVEN_MIRROR:-https://repo.maven.apache.org/maven2}
+        ICEBERG_MAVEN_MIRROR: https://repository.apache.org/content/repositories/orgapacheiceberg-1286
     container_name: pyiceberg-spark
     networks:
       iceberg_net:
