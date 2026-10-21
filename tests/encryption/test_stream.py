@@ -15,8 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from pathlib import Path
-
 import pytest
 
 from pyiceberg.encryption.key_metadata import StandardKeyMetadata
@@ -39,10 +37,26 @@ KEY_METADATA = StandardKeyMetadata(encryption_key=KEY, aad_prefix=AAD_PREFIX)
 # The header a Java `AesGcmOutputStream` writes: "AGS1" then 1 MiB as a little-endian int32.
 JAVA_HEADER = b"AGS1\x00\x00\x10\x00"
 
-# Streams written by Java's `AesGcmOutputStream`, with the parameters documented in ags1/README.md.
-AGS1_FIXTURES = Path(__file__).parent / "ags1"
+# Streams written by Java's `AesGcmOutputFile` (Apache Iceberg 1.11.0), so AGS1 is checked against another
+# implementation's bytes rather than only its own round trip. Each uses key 0x00..0x0f and a plaintext whose
+# byte `i` is `i % 251`. Moving these and their generator to iceberg-verification is tracked in #4010.
 FIXTURE_KEY = bytes(range(16))
 FIXTURE_AAD_PREFIX = b"pyiceberg-ags1"
+JAVA_STREAMS = {
+    # An empty file is the header plus one empty block, not a bare header.
+    "empty": bytes.fromhex("4147533100001000178c6b4fd72e166bc1667356c865baed13878ed51c4340f6426501ec"),
+    "partial-block": bytes.fromhex(
+        "4147533100001000c02998e75683447a486f7dd3dd6c9f8a2a10fbfc956b15fdb35611534fe8d1414c81b17a477b914b"
+        "fa0b515a5060cff94301feb0e85535402a2a2966214e20274635d4c19ae525d4da042ac51ed7db0c6698c731df0ba637"
+        "4aff8b8d5c05297b8896abbfabe09c3ce1a2389c46d14718c17b0a3e33a4ddebc05a11b18ec9c576"
+    ),
+    # Written with a null AAD prefix, so the block index alone is the AAD.
+    "partial-block-no-aad": bytes.fromhex(
+        "4147533100001000117d00679bfa455f29880fe9dcd8d2ae9b8a7e81d40dbce6061631524e5ec61cbac9914317e7e60f"
+        "dff52b32a779b3ae5339ea8859a40b3454a986a7f36b62f6e46699b036b6abe2ae043a86aee0ac5873066bab2420802c"
+        "f970eede664723b455a224b99a5866c862c81640393168355e2acbe90e677a6dbaadab9ffa5cf3dd"
+    ),
+}
 
 
 def decrypt(stream: bytes, key: bytes = KEY, aad_prefix: bytes | None = AAD_PREFIX) -> bytes:
@@ -103,13 +117,13 @@ def test_encrypted_length(plaintext_length: int, encrypted_length: int) -> None:
 @pytest.mark.parametrize(
     "name, plaintext_length, aad_prefix",
     [
-        ("empty.ags1", 0, FIXTURE_AAD_PREFIX),
-        ("partial-block.ags1", 100, FIXTURE_AAD_PREFIX),
-        ("partial-block-no-aad.ags1", 100, None),
+        ("empty", 0, FIXTURE_AAD_PREFIX),
+        ("partial-block", 100, FIXTURE_AAD_PREFIX),
+        ("partial-block-no-aad", 100, None),
     ],
 )
 def test_decrypts_a_java_written_stream(name: str, plaintext_length: int, aad_prefix: bytes | None) -> None:
-    stream = (AGS1_FIXTURES / name).read_bytes()
+    stream = JAVA_STREAMS[name]
     key_metadata = StandardKeyMetadata(encryption_key=FIXTURE_KEY, aad_prefix=aad_prefix, file_length=len(stream))
 
     assert decrypt_ags1(stream, key_metadata) == fixture_plaintext(plaintext_length)
