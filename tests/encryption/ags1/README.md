@@ -44,8 +44,9 @@ Multi-block fixtures are deliberately not checked in. The 1 MiB block size is
 hard-coded, so every extra block adds 1 MiB of incompressible ciphertext to the
 repository and to every sdist. Multi-block Java fixtures, including a block-aligned
 write, are tracked for apache/iceberg-verification in apache/iceberg-python#4010.
-Until then, the tests round-trip multi-block streams built with `AesGcmCipher` and pin
-the little-endian block index in the AAD byte for byte.
+Until then, the tests round-trip multi-block streams through `encrypt_ags1` and
+`decrypt_ags1`, check that they produce the same lengths as Java, and pin the
+little-endian block index in the AAD byte for byte.
 
 ## Parameters
 
