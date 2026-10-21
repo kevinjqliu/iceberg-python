@@ -17,38 +17,15 @@
   ~ under the License.
 -->
 
-# AGS1 test vectors
+# Regenerating the Java AGS1 test vectors
 
-`JAVA_STREAMS` in `test_stream.py` holds AGS1 streams written by Java's
-`AesGcmOutputFile` (Apache Iceberg 1.11.0), not by PyIceberg. They exist so
-PyIceberg's AGS1 support is checked against another implementation's bytes rather
-than only against its own round trip.
+`JAVA_STREAMS` in `test_stream.py` was written by Java's `AesGcmOutputFile` (Apache
+Iceberg 1.11.0), using the key, AAD prefixes and plaintext defined next to it.
 
-| Vector | Encrypted size | Plaintext | Pins |
-| --- | --- | --- | --- |
-| `empty` | 36 B | 0 B | Java writes an 8 byte header **plus one empty block** for an empty file, not a bare header |
-| `partial-block` | 136 B | 100 B | Header, nonce/tag layout, and a single short block |
-| `partial-block-no-aad` | 136 B | 100 B | The same stream with a null AAD prefix, so the block index alone is the AAD |
-
-Multi-block vectors are left out: the 1 MiB block size is hard-coded, so each
-extra block adds 1 MiB of incompressible ciphertext. Moving cross-client vectors
-to iceberg-verification is tracked in apache/iceberg-python#4010.
-
-## Parameters
-
-Every vector uses:
-
-- **Key**: 16 bytes, `0x00` through `0x0f`
-- **AAD prefix**: ASCII `pyiceberg-ags1`, except `partial-block-no-aad`, which has none
-- **Plaintext**: byte `i` is `i % 251`
-
-## Regenerating
-
-Each block uses a fresh random nonce, so regenerating produces different bytes.
-The lengths, and the plaintext each vector decrypts to, are deterministic. The
+Each block uses a fresh random nonce, so regenerating produces different bytes. The
 tests decrypt the vectors rather than compare them byte for byte, so regenerated
-vectors can replace the ones in `test_stream.py` as long as the parameters above
-are unchanged.
+vectors can replace the ones in `test_stream.py` as long as those parameters are
+unchanged.
 
 Save the program below as `GenerateAgs1Vectors.java`, then run it from the same
 directory with JDK 17 or later. It prints one line of hex per vector, ready to

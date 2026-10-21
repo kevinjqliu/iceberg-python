@@ -38,7 +38,8 @@ KEY_METADATA = StandardKeyMetadata(encryption_key=KEY, aad_prefix=AAD_PREFIX)
 JAVA_HEADER = b"AGS1\x00\x00\x10\x00"
 
 # Streams written by Java's `AesGcmOutputFile` (Apache Iceberg 1.11.0), so AGS1 is checked against another
-# implementation's bytes rather than only its own round trip. See README.md for the parameters and how to regenerate them.
+# implementation's bytes rather than only its own round trip. See README.md for how to regenerate them. Multi-block
+# vectors are left out because each block adds 1 MiB; moving cross-client vectors to iceberg-verification is #4010.
 FIXTURE_KEY = bytes(range(16))
 FIXTURE_AAD_PREFIX = b"pyiceberg-ags1"
 JAVA_STREAMS = {
