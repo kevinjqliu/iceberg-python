@@ -30,8 +30,9 @@ empty file. Java, iceberg-rust and PyIceberg all require at least one block inst
 empty file is a header followed by a single empty block. apache/iceberg#18219 tracks which of
 the two forms writers should produce.
 
-`encrypt_ags1` and `decrypt_ags1` work on whole files, matching how PyIceberg reads and writes
-Avro, so their implementation can move to pyiceberg-core without changing callers.
+`_encrypt_ags1` and `_decrypt_ags1` work on whole files, matching how PyIceberg reads and writes
+Avro, so their implementation can move to pyiceberg-core without changing callers. They stay
+private until the manifest reader and writer use them.
 """
 
 from __future__ import annotations
@@ -52,7 +53,7 @@ _CIPHER_BLOCK_SIZE = _PLAIN_BLOCK_SIZE + _BLOCK_OVERHEAD
 _MIN_STREAM_LENGTH = _GCM_STREAM_HEADER_LENGTH + _BLOCK_OVERHEAD
 
 
-def encrypt_ags1(plaintext: bytes, key_metadata: StandardKeyMetadata) -> bytes:
+def _encrypt_ags1(plaintext: bytes, key_metadata: StandardKeyMetadata) -> bytes:
     """Encrypt `plaintext` into an AGS1 stream.
 
     An empty plaintext is written as the header plus one empty block, as Java and iceberg-rust do.
@@ -70,7 +71,7 @@ def encrypt_ags1(plaintext: bytes, key_metadata: StandardKeyMetadata) -> bytes:
     )
 
 
-def decrypt_ags1(data: bytes, key_metadata: StandardKeyMetadata) -> bytes:
+def _decrypt_ags1(data: bytes, key_metadata: StandardKeyMetadata) -> bytes:
     """Decrypt an AGS1 stream, authenticating every block.
 
     Args:

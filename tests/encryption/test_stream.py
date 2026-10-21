@@ -25,9 +25,9 @@ from pyiceberg.encryption.stream import (
     _GCM_STREAM_HEADER_LENGTH,
     _MIN_STREAM_LENGTH,
     _PLAIN_BLOCK_SIZE,
+    _decrypt_ags1,
+    _encrypt_ags1,
     _stream_block_aad,
-    decrypt_ags1,
-    encrypt_ags1,
 )
 
 KEY = b"0123456789012345"
@@ -61,7 +61,7 @@ JAVA_STREAMS = {
 
 def decrypt(stream: bytes, key: bytes = KEY, aad_prefix: bytes | None = AAD_PREFIX) -> bytes:
     """Decrypt `stream`, trusting its own length as the key metadata's `file_length`."""
-    return decrypt_ags1(stream, StandardKeyMetadata(encryption_key=key, aad_prefix=aad_prefix, file_length=len(stream)))
+    return _decrypt_ags1(stream, StandardKeyMetadata(encryption_key=key, aad_prefix=aad_prefix, file_length=len(stream)))
 
 
 def fixture_plaintext(length: int) -> bytes:
@@ -93,7 +93,7 @@ def test_stream_block_aad_encodes_the_index_little_endian(block_index: int, expe
 def test_round_trip(plaintext_length: int, aad_prefix: bytes | None) -> None:
     plaintext = fixture_plaintext(plaintext_length)
 
-    stream = encrypt_ags1(plaintext, StandardKeyMetadata(encryption_key=KEY, aad_prefix=aad_prefix))
+    stream = _encrypt_ags1(plaintext, StandardKeyMetadata(encryption_key=KEY, aad_prefix=aad_prefix))
 
     assert stream.startswith(JAVA_HEADER)
     assert decrypt(stream, aad_prefix=aad_prefix) == plaintext
@@ -111,7 +111,7 @@ def test_round_trip(plaintext_length: int, aad_prefix: bytes | None) -> None:
 )
 def test_encrypted_length(plaintext_length: int, encrypted_length: int) -> None:
     """An empty file gets one empty block, and a block-aligned file gets no trailing empty block, as in Java."""
-    assert len(encrypt_ags1(bytes(plaintext_length), KEY_METADATA)) == encrypted_length
+    assert len(_encrypt_ags1(bytes(plaintext_length), KEY_METADATA)) == encrypted_length
 
 
 @pytest.mark.parametrize(
@@ -126,20 +126,20 @@ def test_decrypts_a_java_written_stream(name: str, plaintext_length: int, aad_pr
     stream = JAVA_STREAMS[name]
     key_metadata = StandardKeyMetadata(encryption_key=FIXTURE_KEY, aad_prefix=aad_prefix, file_length=len(stream))
 
-    assert decrypt_ags1(stream, key_metadata) == fixture_plaintext(plaintext_length)
-    assert len(encrypt_ags1(fixture_plaintext(plaintext_length), key_metadata)) == len(stream)
+    assert _decrypt_ags1(stream, key_metadata) == fixture_plaintext(plaintext_length)
+    assert len(_encrypt_ags1(fixture_plaintext(plaintext_length), key_metadata)) == len(stream)
 
 
 def test_decrypt_requires_file_length() -> None:
-    stream = encrypt_ags1(b"data", KEY_METADATA)
+    stream = _encrypt_ags1(b"data", KEY_METADATA)
 
     with pytest.raises(ValueError, match="key metadata has no file_length"):
-        decrypt_ags1(stream, KEY_METADATA)
+        _decrypt_ags1(stream, KEY_METADATA)
 
 
 def test_a_truncated_stream_still_authenticates() -> None:
     """Dropping a trailing block leaves every remaining block valid, so the length must come from key metadata."""
-    stream = encrypt_ags1(fixture_plaintext(2 * _PLAIN_BLOCK_SIZE), KEY_METADATA)
+    stream = _encrypt_ags1(fixture_plaintext(2 * _PLAIN_BLOCK_SIZE), KEY_METADATA)
 
     truncated = stream[: _GCM_STREAM_HEADER_LENGTH + _CIPHER_BLOCK_SIZE]
 
@@ -148,12 +148,12 @@ def test_a_truncated_stream_still_authenticates() -> None:
 
 @pytest.mark.parametrize("change", ["truncate", "extend"])
 def test_decrypt_rejects_a_length_other_than_the_trusted_length(change: str) -> None:
-    stream = encrypt_ags1(fixture_plaintext(2 * _PLAIN_BLOCK_SIZE), KEY_METADATA)
+    stream = _encrypt_ags1(fixture_plaintext(2 * _PLAIN_BLOCK_SIZE), KEY_METADATA)
     key_metadata = StandardKeyMetadata(encryption_key=KEY, aad_prefix=AAD_PREFIX, file_length=len(stream))
     changed = stream[: _GCM_STREAM_HEADER_LENGTH + _CIPHER_BLOCK_SIZE] if change == "truncate" else stream + b"\x00"
 
     with pytest.raises(ValueError, match=f"key metadata expects {len(stream)} bytes, got {len(changed)}"):
-        decrypt_ags1(changed, key_metadata)
+        _decrypt_ags1(changed, key_metadata)
 
 
 @pytest.mark.parametrize("length", [0, 7, _GCM_STREAM_HEADER_LENGTH, _MIN_STREAM_LENGTH - 1])
@@ -180,7 +180,7 @@ def test_decrypt_rejects_a_truncated_last_block(last_block_length: int) -> None:
 
 
 def test_decrypt_rejects_reordered_blocks() -> None:
-    stream = encrypt_ags1(bytes(2 * _PLAIN_BLOCK_SIZE), KEY_METADATA)
+    stream = _encrypt_ags1(bytes(2 * _PLAIN_BLOCK_SIZE), KEY_METADATA)
     first, second = (
         stream[_GCM_STREAM_HEADER_LENGTH : _GCM_STREAM_HEADER_LENGTH + _CIPHER_BLOCK_SIZE],
         stream[_GCM_STREAM_HEADER_LENGTH + _CIPHER_BLOCK_SIZE :],
@@ -191,14 +191,14 @@ def test_decrypt_rejects_reordered_blocks() -> None:
 
 
 def test_decrypt_rejects_another_files_aad_prefix() -> None:
-    stream = encrypt_ags1(bytes(100), KEY_METADATA)
+    stream = _encrypt_ags1(bytes(100), KEY_METADATA)
 
     with pytest.raises(ValueError, match="wrong decryption key; or corrupt/tampered data"):
         decrypt(stream, aad_prefix=b"another file's prefix")
 
 
 def test_decrypt_rejects_the_wrong_key() -> None:
-    stream = encrypt_ags1(bytes(100), KEY_METADATA)
+    stream = _encrypt_ags1(bytes(100), KEY_METADATA)
 
     with pytest.raises(ValueError, match="wrong decryption key; or corrupt/tampered data"):
         decrypt(stream, key=b"1123456789012345")
