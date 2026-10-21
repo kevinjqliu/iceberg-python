@@ -26,7 +26,6 @@ import org.apache.iceberg.io.PositionOutputStream;
 
 /** Writes the AGS1 fixtures in this directory with Java's AesGcmOutputStream. See README.md. */
 public class GenerateAgs1Fixtures {
-  static final int PLAIN_BLOCK_SIZE = 1024 * 1024;
   static final byte[] KEY = new byte[16];
   static final byte[] AAD_PREFIX = "pyiceberg-ags1".getBytes(StandardCharsets.UTF_8);
 
@@ -64,6 +63,5 @@ public class GenerateAgs1Fixtures {
     write(dir, "empty.ags1", 0, AAD_PREFIX);
     write(dir, "partial-block.ags1", 100, AAD_PREFIX);
     write(dir, "partial-block-no-aad.ags1", 100, null);
-    write(dir, "aligned-multi-block.ags1", 2 * PLAIN_BLOCK_SIZE, AAD_PREFIX);
   }
 }

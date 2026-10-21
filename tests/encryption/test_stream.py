@@ -251,7 +251,6 @@ def test_blocks_cannot_be_moved_between_files() -> None:
         ("empty.ags1", 0, 1, FIXTURE_AAD_PREFIX),
         ("partial-block.ags1", 100, 1, FIXTURE_AAD_PREFIX),
         ("partial-block-no-aad.ags1", 100, 1, None),
-        ("aligned-multi-block.ags1", 2 * _PLAIN_BLOCK_SIZE, 2, FIXTURE_AAD_PREFIX),
     ],
 )
 def test_decrypts_a_java_written_stream(name: str, plaintext_length: int, num_blocks: int, aad_prefix: bytes | None) -> None:
@@ -277,25 +276,18 @@ def test_java_encodes_an_empty_file_as_one_empty_block() -> None:
     )
 
 
-def test_java_appends_no_trailing_block_to_a_block_aligned_stream() -> None:
-    """A block-aligned write ends on its last full block, so the length holds no extra empty block."""
-    stream = (AGS1_FIXTURES / "aligned-multi-block.ags1").read_bytes()
-
-    assert len(stream) == _GCM_STREAM_HEADER_LENGTH + 2 * _CIPHER_BLOCK_SIZE
-
-
-def test_a_truncated_java_stream_still_authenticates() -> None:
+def test_a_truncated_stream_still_authenticates() -> None:
     """Dropping a trailing block leaves every remaining block valid, so the length must come from key metadata."""
-    stream = (AGS1_FIXTURES / "aligned-multi-block.ags1").read_bytes()
+    stream = build_stream(fixture_plaintext(2 * _PLAIN_BLOCK_SIZE))
 
     truncated = stream[: _GCM_STREAM_HEADER_LENGTH + _CIPHER_BLOCK_SIZE]
 
-    assert decrypt_stream(truncated, FIXTURE_KEY, FIXTURE_AAD_PREFIX) == fixture_plaintext(_PLAIN_BLOCK_SIZE)
+    assert decrypt_stream(truncated, KEY, AAD_PREFIX) == fixture_plaintext(_PLAIN_BLOCK_SIZE)
 
 
 def test_the_trusted_length_exposes_a_truncated_stream() -> None:
     """The layout from the trusted length outruns a truncated file, which is how a reader detects the drop."""
-    stream = (AGS1_FIXTURES / "aligned-multi-block.ags1").read_bytes()
+    stream = build_stream(fixture_plaintext(2 * _PLAIN_BLOCK_SIZE))
     truncated = stream[: _GCM_STREAM_HEADER_LENGTH + _CIPHER_BLOCK_SIZE]
 
     layout = _Ags1Layout.from_encrypted_length(len(stream))

@@ -21,7 +21,7 @@
 
 These files were written by Java's `AesGcmOutputStream` (Apache Iceberg 1.11.0), not
 by PyIceberg. They exist so PyIceberg's AGS1 support is checked against another
-implementation's bytes rather than only against its own round trip. All four also
+implementation's bytes rather than only against its own round trip. All three also
 decrypt with iceberg-rust 0.10.1, through its `EncryptedInputFile`.
 
 ## Fixtures
@@ -31,7 +31,6 @@ decrypt with iceberg-rust 0.10.1, through its `EncryptedInputFile`.
 | `empty.ags1` | 36 B | 0 B | Java writes an 8 byte header **plus one empty block** for an empty file, not a bare header |
 | `partial-block.ags1` | 136 B | 100 B | Header, nonce/tag layout, and a single short block |
 | `partial-block-no-aad.ags1` | 136 B | 100 B | The same stream with a null AAD prefix, so the block index alone is the AAD |
-| `aligned-multi-block.ags1` | 2097216 B | 2 MiB | Two full blocks: the little-endian block index in each block's AAD, and that a block-aligned write appends **no** trailing empty block |
 
 `empty.ags1` is worth calling out. The spec says the last block has a non-zero
 length, which makes a bare 8 byte header its encoding of an empty file. Java instead
@@ -41,9 +40,12 @@ spec here: `_MIN_STREAM_LENGTH` is 36, so a bare header is rejected rather than 
 an empty stream. apache/iceberg#18219 tracks which of the two forms writers should
 produce.
 
-Block-aligned and partial *single* block variants are deliberately not checked in.
-The 1 MiB block size is hard-coded, so each would add another 1 MiB of
-incompressible ciphertext without covering a case the four files above miss.
+Multi-block fixtures are deliberately not checked in. The 1 MiB block size is
+hard-coded, so every extra block adds 1 MiB of incompressible ciphertext to the
+repository and to every sdist. Multi-block Java fixtures, including a block-aligned
+write, are tracked for apache/iceberg-verification in apache/iceberg-python#4010.
+Until then, the tests round-trip multi-block streams built with `AesGcmCipher` and pin
+the little-endian block index in the AAD byte for byte.
 
 ## Parameters
 
